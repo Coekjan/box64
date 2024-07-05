@@ -439,7 +439,7 @@ GO(omp_get_thread_num, iFv)
 //GO(omp_set_num_teams, 
 //GO(omp_set_num_teams_, 
 //GO(omp_set_num_teams_8_, 
-//GO(omp_set_num_threads, 
+GO(omp_set_num_threads, vFi)
 //GO(omp_set_num_threads_, 
 //GO(omp_set_num_threads_8_, 
 //GO(omp_set_schedule, 
