@@ -977,6 +977,7 @@
 #() iFiiui
 #() iFiill
 #() iFiipi
+#() iFiipu
 #() iFiipp
 #() iFiWii
 #() iFiuwp
@@ -1543,13 +1544,16 @@
 #() iFiuuuu
 #() iFiuuup
 #() iFiuLip
+#() iFiuppi
 #() iFillLL
 #() iFipiii
 #() iFipiup
 #() iFipipi
 #() iFipipu
+#() iFipipp
 #() iFipuip
 #() iFipuui
+#() iFipupL
 #() iFipLup
 #() iFippuu
 #() iFippLi
@@ -1699,6 +1703,7 @@
 #() lFipLlL
 #() lFipLLi
 #() lFipLpp
+#() lFippLL
 #() lFpuipC
 #() lFpuuLL
 #() lFppupp
@@ -2918,6 +2923,7 @@
 #() iFEppppppipp
 #() iFiiiiiiiiip
 #() iFpiipiiipip
+#() iFpipiipippi
 #() iFpippddiidd
 #() iFpCuWCCCCup
 #() iFpuuLiuiiLL
@@ -4156,6 +4162,7 @@ wrappedlibc:
 - pFp:
   - __deregister_frame_info
   - mallinfo
+  - mallinfo2
 - vFpi:
   - __longjmp_chk
   - _longjmp
@@ -4279,6 +4286,7 @@ wrappedlibc:
   - sscanf
   - swscanf
 - iFppA:
+  - __isoc23_vfscanf
   - __isoc99_vfscanf
   - __isoc99_vsscanf
   - __isoc99_vswscanf
@@ -4375,6 +4383,8 @@ wrappedlibc:
   - prctl
 - iFipiip:
   - epoll_pwait
+- iFipipp:
+  - epoll_pwait2
 - iFipppp:
   - getopt_long
   - getopt_long_only

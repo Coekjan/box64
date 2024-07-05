@@ -2075,6 +2075,14 @@ EXPORT int32_t my_epoll_pwait(x64emu_t* emu, int32_t epfd, void* events, int32_t
         UnalignEpollEvent(events, _events, ret);
     return ret;
 }
+EXPORT int32_t my_epoll_pwait2(x64emu_t* emu, int32_t epfd, void* events, int32_t maxevents, const struct timespec* timeout, const sigset_t* sigmask)
+{
+    struct epoll_event _events[maxevents];
+    int32_t ret = epoll_pwait2(epfd, events?_events:NULL, maxevents, timeout, sigmask);
+    if(ret>0)
+        UnalignEpollEvent(events, _events, ret);
+    return ret;
+}
 #endif
 
 #ifndef ANDROID
@@ -3015,6 +3023,22 @@ EXPORT void* my_mallinfo(x64emu_t* emu, void* p)
         *(struct mallinfo*)p=f();
     else
         memset(p, 0, sizeof(struct mallinfo));
+    return p;
+}
+
+typedef struct mallinfo2 (*mallinfo2_fnc)(void);
+EXPORT void* my_mallinfo2(x64emu_t* emu, void* p)
+{
+    static mallinfo2_fnc f = NULL;
+    static int inited = 0;
+    if(!inited) {
+        inited = 1;
+        f = (mallinfo2_fnc)dlsym(my_lib->w.lib, "mallinfo2");
+    }
+    if(f)
+        *(struct mallinfo2*)p=f();
+    else
+        memset(p, 0, sizeof(struct mallinfo2));
     return p;
 }
 
