@@ -1,0 +1,3 @@
+[submodule "cs2s"]
+	path = cs2s
+	url = ../cs2s
