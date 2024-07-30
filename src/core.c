@@ -40,6 +40,10 @@
 #include "library.h"
 #include "core.h"
 
+#ifdef CS2
+#include "cs2c.h"
+#endif
+
 box64context_t *my_context = NULL;
 int box64_quit = 0;
 int box64_exit_code = 0;
@@ -1669,6 +1673,10 @@ void endBox64()
         box_free(box64_custom_gstreamer);
         box64_custom_gstreamer = NULL;
     }
+
+#ifdef CS2
+    cs2c_exit();
+#endif
 }
 
 
@@ -2235,6 +2243,11 @@ int initialize(int argc, const char **argv, char** env, x64emu_t** emulator, elf
         #endif
     }
     AddMainElfToLinkmap(elf_header);
+
+#ifdef CS2
+    cs2c_init();
+#endif
+
     // pre-load lib if needed
     if(ld_preload.size) {
         my_context->preload = new_neededlib(0);

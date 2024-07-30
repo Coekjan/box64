@@ -68,3 +68,6 @@ backup/
 
 # macOS
 .DS_Store
+
+# generated files
+src/include/generated/*
