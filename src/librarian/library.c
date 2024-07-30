@@ -283,7 +283,9 @@ static int loadEmulatedLib(const char* libname, library_t *lib, box64context_t* 
 {
     if(FileExist(libname, IS_FILE))
     {
+#ifdef CS2
         cs2c_lib_attach((const char *[]) { libname }, 1);
+#endif
         FILE *f = fopen(libname, "rb");
         if(!f) {
             printf_log(LOG_NONE, "Error: Cannot open %s\n", libname);
