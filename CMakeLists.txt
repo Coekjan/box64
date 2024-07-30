@@ -39,6 +39,7 @@ option(SW64 "Set ON if targeting an SW64 based device" ${SW64})
 option(CI "Set to ON if running in CI" ${CI})
 option(WITH_MOLD "Set to ON to use with mold" ${WITH_MOLD})
 option(BOX32 "Set to ON to add Linux 32bits support (experimental, do not use)" ${BO64})
+option(CS2 "Set to ON to use with cs2" ${CS2})
 
 if(TERMUX)
     set(TERMUX_PATH "/data/data/com.termux/files")
@@ -286,23 +287,43 @@ if(ARM_DYNAREC)
     enable_language(ASM)
     include_directories("${BOX64_ROOT}/src/dynarec/arm64")
     set(DYNAREC ON)
+    if(CS2)
+        set(RUST_TARGET "aarch64-unknown-linux-gnu")
+    endif()
 elseif(RV64_DYNAREC)
     add_definitions(-DDYNAREC)
     add_definitions(-DRV64)
     enable_language(ASM)
     include_directories("${BOX64_ROOT}/src/dynarec/rv64")
     set(DYNAREC ON)
+    if(CS2)
+        set(RUST_TARGET "riscv64gc-unknown-linux-gnu")
+    endif()
 elseif(LARCH64_DYNAREC)
     add_definitions(-DDYNAREC)
     add_definitions(-DLA64)
     enable_language(ASM)
     include_directories("${BOX64_ROOT}/src/dynarec/la64")
     set(DYNAREC ON)
+    if(CS2)
+        set(RUST_TARGET "loongarch64-unknown-linux-gnu")
+    endif()
 else()
     set(DYNAREC OFF)
 endif()
 
 set(BOX64_ROOT ${CMAKE_SOURCE_DIR})
+if(CS2)
+    set(CS2S_ROOT "${BOX64_ROOT}/cs2s")
+    add_definitions(-DCS2)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(CS2S_CCAPI_DIR "${CS2S_ROOT}/target/${RUST_TARGET}/debug")
+        set(CS2S_CARGO_PROFILE "")
+    else()
+        set(CS2S_CCAPI_DIR "${CS2S_ROOT}/target/${RUST_TARGET}/release")
+        set(CS2S_CARGO_PROFILE "--release")
+    endif()
+endif()
 
 add_definitions(-std=gnu11 -funwind-tables -fvisibility=hidden)
 
@@ -412,6 +433,11 @@ endif()
 if(NOT ANDROID)
     list(APPEND ELFLOADER_SRC
         "${BOX64_ROOT}/src/libtools/obstack.c"
+    )
+endif()
+if(CS2)
+    list(APPEND ELFLOADER_SRC
+        "${BOX64_ROOT}/src/cs2c.c"
     )
 endif()
 
@@ -814,6 +840,30 @@ else()
 endif()
 
 
+if(CS2)
+    add_custom_command(
+        OUTPUT "${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
+        # FIXME: Check if cbindgen is installed
+        COMMAND "cbindgen" "--config=${CS2S_ROOT}/cbindgen.toml"
+                        "--crate=cs2s-ccapi"
+                        "--output=${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
+        MAIN_DEPENDENCY "${CS2S_ROOT}/cbindgen.toml"
+        WORKING_DIRECTORY "${CS2S_ROOT}"
+    )
+    add_custom_command(
+        # FIXME: Check if cargo & cross is installed
+        OUTPUT "${CS2S_CCAPI_DIR}/libcs2s_ccapi.so"
+        COMMAND "cross" "build" "--package=cs2s-ccapi" "--target=${RUST_TARGET}" "${CS2S_CARGO_FLAGS}"
+        MAIN_DEPENDENCY "${BOX64_ROOT}/cs2s/Cargo.toml"
+        WORKING_DIRECTORY "${BOX64_ROOT}/cs2s"
+    )
+    add_custom_target(
+        CS2S
+        DEPENDS "${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
+                "${CS2S_CCAPI_DIR}/libcs2s_ccapi.so"
+    )
+endif()
+
 if(DYNAREC)
     set(DYNAREC_SRC
         "${BOX64_ROOT}/src/dynarec/dynablock.c"
@@ -1011,6 +1061,13 @@ if(DYNAREC)
         $<TARGET_OBJECTS:native_pass3>
         $<TARGET_OBJECTS:test_interpreter>
     )
+
+    if(CS2)
+        add_dependencies(native_pass0 CS2S)
+        add_dependencies(native_pass1 CS2S)
+        add_dependencies(native_pass2 CS2S)
+        add_dependencies(native_pass3 CS2S)
+    endif()
 endif()
 
 # creates git_head.h
@@ -1036,6 +1093,10 @@ add_dependencies(${BOX64} WRAPPERS)
 if(BOX32)
     add_dependencies(${BOX64} WRAPPERS32)
 endif()
+
+if(CS2)
+    add_dependencies(${BOX64} CS2S)
+endif()
 #add_dependencies(${BOX64} PRINTER)
 #target_link_libraries(${BOX64} c m dl rt pthread resolv)
 if(STATICBUILD)
@@ -1056,6 +1117,11 @@ if(DYNAREC)
     target_link_libraries(${BOX64} dynarec)
 endif()
 target_link_libraries(${BOX64} interpreter)
+
+if(CS2)
+    target_link_directories(${BOX64} PRIVATE "${CS2S_CCAPI_DIR}")
+    target_link_libraries(${BOX64} cs2s_ccapi)
+endif()
 
 if(${CMAKE_VERSION} VERSION_LESS "3.13")
     if(NOT NOLOADADDR)

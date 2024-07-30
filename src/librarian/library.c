@@ -39,6 +39,10 @@
 #include "library_list.h"
 #endif
 
+#ifdef CS2
+#include "cs2c.h"
+#endif
+
 #undef GO
 #ifdef BOX32
 #define GO(P, N) int wrapped##N##_init32(library_t* lib, box64context_t *box64); \
@@ -301,6 +305,7 @@ static int loadEmulatedLib(const char* libname, library_t *lib, box64context_t* 
 {
     if(FileExist(libname, IS_FILE))
     {
+        cs2c_lib_attach((const char *[]) { libname }, 1);
         FILE *f = fopen(libname, "rb");
         if(!f) {
             printf_log(LOG_NONE, "Error: Cannot open %s\n", libname);
