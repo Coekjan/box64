@@ -632,9 +632,9 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
             }
             printf_log(LOG_NONE, "CS2 Cache Loaded: %p\n", (void*)addr);
         }
-        size_t insts_rsize = *(size_t*)(actual_p + sz - 2 * sizeof(size_t));
-        size_t isize = *(size_t*)(actual_p + sz - sizeof(size_t));
-        void *next = (actual_p + sz - 2 * sizeof(size_t) - insts_rsize - 4 * sizeof(void*));
+        size_t insts_rsize = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t));
+        int isize = *(int*)(actual_p + sz - sizeof(block->isize));
+        void *next = (actual_p + sz - sizeof(block->isize) - sizeof(size_t) - insts_rsize - 4 * sizeof(void*));
         block->actual_block = actual_p;
         block->size = sz;
         block->x64_addr = (void *)addr;
@@ -645,11 +645,14 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         // block->always_test
         // block->dirty
         block->isize = isize;
-        block->instsize = actual_p + sz - sizeof(size_t) - insts_rsize;
-        block->jmpnext = block->instsize - 3 * sizeof(void*);
+        block->instsize = next + 4 * sizeof(void*);
+        block->jmpnext = next + sizeof(void*);
         *(dynablock_t**)next = block;
-        *(void**)(next+3*sizeof(void*)) = native_next;
-        CreateJmpNext(block->jmpnext, next+3*sizeof(void*));            /// NOTE: bug here ??
+        *(void**)(next + 3 * sizeof(void*)) = native_next;
+        CreateJmpNext(block->jmpnext, next + 3 * sizeof(void*));
+
+        // TODO: Recover Table64
+
         __clear_cache(actual_p, actual_p + sz);
         current_helper = NULL;
         printf_log(LOG_NONE, "CS2 Done, block %p\n", (void*)block->block);
@@ -760,7 +763,7 @@ slow_path:
     insts_rsize = (insts_rsize+7)&~7;   // round the size...
     size_t native_size = (helper.native_size+7)&~7;   // round the size...
     // ok, now allocate mapped memory, with executable flag on
-    size_t sz = sizeof(void*) + native_size + helper.table64size*sizeof(uint64_t) + 4*sizeof(void*) + insts_rsize + sizeof(insts_rsize) + sizeof(helper.isize);
+    size_t sz = sizeof(void*) + native_size + helper.table64size*sizeof(uint64_t) + 4*sizeof(void*) + insts_rsize + sizeof(insts_rsize) + sizeof(block->isize);
     //           dynablock_t*     block (arm insts)            table64               jmpnext code       instsize
     void* actual_p = (void*)AllocDynarecMap(sz);
     void* p = (void*)(((uintptr_t)actual_p) + sizeof(void*));
@@ -816,7 +819,7 @@ slow_path:
     block->dirty = block->always_test;
     *(dynablock_t**)next = block;
     *(size_t*)(instsize+insts_rsize) = insts_rsize;
-    *(size_t*)(instsize+insts_rsize+sizeof(size_t)) = helper.isize;
+    *(int*)(instsize+insts_rsize+sizeof(insts_rsize)) = block->isize;
     *(void**)(next+3*sizeof(void*)) = native_next;
     CreateJmpNext(block->jmpnext, next+3*sizeof(void*));
     //block->x64_addr = (void*)start;
