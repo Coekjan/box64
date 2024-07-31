@@ -939,20 +939,34 @@ if(DYNAREC)
     add_dependencies(native_pass2 WRAPPERS)
     add_dependencies(native_pass3 WRAPPERS)
 
-    add_library(dynarec STATIC
-        $<TARGET_OBJECTS:dynarec_native>
-        $<TARGET_OBJECTS:native_pass0>
-        $<TARGET_OBJECTS:native_pass1>
-        $<TARGET_OBJECTS:native_pass2>
-        $<TARGET_OBJECTS:native_pass3>
-        $<TARGET_OBJECTS:test_interpreter>
-    )
-
     if(CS2)
+        add_library(native_pass4 OBJECT ${DYNAREC_PASS})
+        set_target_properties(native_pass4 PROPERTIES COMPILE_FLAGS "-DSTEP=4")
+        add_dependencies(native_pass4 WRAPPERS)
+
         add_dependencies(native_pass0 CS2S)
         add_dependencies(native_pass1 CS2S)
         add_dependencies(native_pass2 CS2S)
         add_dependencies(native_pass3 CS2S)
+        add_dependencies(native_pass4 CS2S)
+        add_library(dynarec STATIC
+            $<TARGET_OBJECTS:dynarec_native>
+            $<TARGET_OBJECTS:native_pass0>
+            $<TARGET_OBJECTS:native_pass1>
+            $<TARGET_OBJECTS:native_pass2>
+            $<TARGET_OBJECTS:native_pass3>
+            $<TARGET_OBJECTS:native_pass4>
+            $<TARGET_OBJECTS:test_interpreter>
+        )
+    else()
+        add_library(dynarec STATIC
+            $<TARGET_OBJECTS:dynarec_native>
+            $<TARGET_OBJECTS:native_pass0>
+            $<TARGET_OBJECTS:native_pass1>
+            $<TARGET_OBJECTS:native_pass2>
+            $<TARGET_OBJECTS:native_pass3>
+            $<TARGET_OBJECTS:test_interpreter>
+        )
     endif()
 endif()
 

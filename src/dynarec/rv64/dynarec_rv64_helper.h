@@ -12,6 +12,8 @@
 #include "dynarec_rv64_pass2.h"
 #elif STEP == 3
 #include "dynarec_rv64_pass3.h"
+#elif STEP == 4
+#include "dynarec_rv64_pass4.h"
 #endif
 
 #include "debug.h"
@@ -1462,7 +1464,7 @@ int extcache_st_coherency(dynarec_rv64_t* dyn, int ninst, int a, int b);
 #else
 #define ST_IS_F(A) (extcache_get_st(dyn, ninst, A) == EXT_CACHE_ST_F)
 #define ST_IS_I64(A) (extcache_get_st(dyn, ninst, A) == EXT_CACHE_ST_I64)
-#if STEP == 3
+#if STEP == 3 || STEP == 4
 #define X87_COMBINE(A, B) extcache_st_coherency(dyn, ninst, A, B)
 #else
 #define X87_COMBINE(A, B) extcache_get_st(dyn, ninst, A)

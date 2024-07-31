@@ -1052,7 +1052,7 @@ void x87_purgecache(dynarec_rv64_t* dyn, int ninst, int next, int s1, int s2, in
                     extcache_promote_double(dyn, ninst, st);
                 }
                 #endif
-                #if STEP == 3
+                #if STEP == 3 || STEP == 4
                 if(!next && extcache_get_current_st(dyn, ninst, st) != EXT_CACHE_ST_D) {
                     MESSAGE(LOG_DUMP, "Warning, incoherency with purged ST%d cache\n", st);
                 }

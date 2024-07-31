@@ -299,7 +299,7 @@ int Table64(dynarec_native_t *dyn, uint64_t val, int pass)
         idx = dyn->table64size++;
         if(idx < dyn->table64cap)
             dyn->table64[idx] = val;
-        else if(pass==3)
+        else if(pass==3 || pass==4)
             printf_log(LOG_NONE, "Warning, table64 bigger than expected %d vs %d\n", idx, dyn->table64cap);
     }
     // calculate offset
@@ -517,6 +517,7 @@ uintptr_t native_pass0(dynarec_native_t* dyn, uintptr_t addr, int alternate, int
 uintptr_t native_pass1(dynarec_native_t* dyn, uintptr_t addr, int alternate, int is32bits);
 uintptr_t native_pass2(dynarec_native_t* dyn, uintptr_t addr, int alternate, int is32bits);
 uintptr_t native_pass3(dynarec_native_t* dyn, uintptr_t addr, int alternate, int is32bits);
+uintptr_t native_pass4(dynarec_native_t* dyn, uintptr_t addr, int alternate, int is32bits);
 
 void* CreateEmptyBlock(dynablock_t* block, uintptr_t addr) {
     block->isize = 0;
@@ -602,64 +603,6 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         protectDB(addr, end-addr);  //end is 1byte after actual end
     // compute hash signature
     uint32_t hash = X31_hash_code((void*)addr, end-addr);
-#ifdef CS2
-    // TODO: PER-LIB lookup!
-    if (addr >= 0x3f00000000 && addr < 0x3f0000a000) {
-        uint32_t host_buf;
-        size_t host_sz = 0;
-        int ret = cs2c_lookup("/lib/libcap.so.2", addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
-        if (ret == 0) {
-            // Cache Hit
-            printf_log(LOG_NONE, "CS2 Cache Hit: %p\n", (void*)addr);
-        } else if (ret == -ENOMEM) {
-            // Cache Hit, but buffer too small
-            printf_log(LOG_NONE, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
-        } else {
-            // Cache Miss
-            goto slow_path;
-        }
-        size_t sz = host_sz + sizeof(void*);
-        void *actual_p = (void*)AllocDynarecMap(sz);
-        block->block = actual_p + sizeof(void*);
-        *(dynablock_t**)actual_p = block;
-        if (ret == 0) {
-            memcpy(block->block, &host_buf, host_sz);
-        } else {
-            if ((ret = cs2c_lookup("/lib/libcap.so.2", addr, (void*)addr, end - addr, block->block, host_sz, &host_sz)) != 0) {
-                printf_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
-                FreeDynarecMap((uintptr_t)actual_p);
-                goto slow_path;
-            }
-            printf_log(LOG_NONE, "CS2 Cache Loaded: %p\n", (void*)addr);
-        }
-        size_t insts_rsize = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t));
-        int isize = *(int*)(actual_p + sz - sizeof(block->isize));
-        void *next = (actual_p + sz - sizeof(block->isize) - sizeof(size_t) - insts_rsize - 4 * sizeof(void*));
-        block->actual_block = actual_p;
-        block->size = sz;
-        block->x64_addr = (void *)addr;
-        block->x64_size = end - addr;
-        block->hash = hash;
-        // block->done
-        // block->gone
-        // block->always_test
-        // block->dirty
-        block->isize = isize;
-        block->instsize = next + 4 * sizeof(void*);
-        block->jmpnext = next + sizeof(void*);
-        *(dynablock_t**)next = block;
-        *(void**)(next + 3 * sizeof(void*)) = native_next;
-        CreateJmpNext(block->jmpnext, next + 3 * sizeof(void*));
-
-        // TODO: Recover Table64
-
-        __clear_cache(actual_p, actual_p + sz);
-        current_helper = NULL;
-        printf_log(LOG_NONE, "CS2 Done, block %p\n", (void*)block->block);
-        return (void*)block->block;
-    }
-slow_path:
-#endif
     // calculate barriers
     for(int ii=0; ii<helper.jmp_sz; ++ii) {
         int i = helper.jmps[ii];
@@ -742,6 +685,75 @@ slow_path:
     }
     updateYmm0s(&helper, 0, 0);
 
+#ifdef CS2
+    // TODO: PER-LIB lookup!
+    if (addr >= 0x3f00000000 && addr < 0x3f0000a000) {
+        uint32_t host_buf;
+        size_t host_sz = 0;
+        int ret = cs2c_lookup("/lib/libcap.so.2", addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
+        if (ret == 0) {
+            // Cache Hit
+            printf_log(LOG_INFO, "CS2 Cache Hit: %p\n", (void*)addr);
+        } else if (ret == -ENOMEM) {
+            // Cache Hit, but buffer too small
+            printf_log(LOG_INFO, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
+        } else {
+            // Cache Miss
+            goto slow_path;
+        }
+        size_t sz = host_sz + sizeof(void*);
+        void *actual_p = (void*)AllocDynarecMap(sz);
+        block->block = actual_p + sizeof(void*);
+        *(dynablock_t**)actual_p = block;
+        if (ret == 0) {
+            memcpy(block->block, &host_buf, host_sz);
+        } else {
+            if ((ret = cs2c_lookup("/lib/libcap.so.2", addr, (void*)addr, end - addr, block->block, host_sz, &host_sz)) != 0) {
+                printf_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
+                FreeDynarecMap((uintptr_t)actual_p);
+                goto slow_path;
+            }
+            printf_log(LOG_INFO, "CS2 Cache Loaded: %p\n", (void*)addr);
+        }
+        size_t native_size = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t) - sizeof(size_t));
+        size_t insts_rsize = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t));
+        int isize = *(int*)(actual_p + sz - sizeof(block->isize));
+        void *next = (actual_p + sz - sizeof(block->isize) - sizeof(size_t) - insts_rsize - 4 * sizeof(void*));
+        void *tablestart = block->block + native_size;
+        block->actual_block = actual_p;
+        block->size = sz;
+        block->x64_addr = (void *)addr;
+        block->x64_size = end - addr;
+        block->hash = hash;
+        // block->done
+        // block->gone
+        // block->always_test
+        // block->dirty
+        block->isize = isize;
+        block->instsize = next + 4 * sizeof(void*);
+        block->jmpnext = next + sizeof(void*);
+        *(dynablock_t**)next = block;
+        *(void**)(next + 3 * sizeof(void*)) = native_next;
+        CreateJmpNext(block->jmpnext, next + 3 * sizeof(void*));
+
+        helper.block = block->block;
+        helper.tablestart = (uintptr_t)tablestart;
+        helper.jmp_next = (uintptr_t)next + sizeof(void*);
+        helper.instsize = (instsize_t*)(block->instsize);
+        helper.table64cap = (next - tablestart) / sizeof(uint64_t);
+        helper.table64 = (uint64_t*)tablestart;
+        helper.native_size = 0;
+        helper.table64size = 0; // reset table64 (but not the cap)
+        helper.insts_size = 0;  // reset
+        native_pass4(&helper, addr, alternate, is32bits);
+
+        __clear_cache(actual_p, actual_p + sz);
+        current_helper = NULL;
+        printf_log(LOG_INFO, "CS2 Done, block %p\n", (void*)block->block);
+        return (void*)block->block;
+    }
+slow_path:
+#endif
 
     // pass 1, float optimizations, first pass for flags
     native_pass1(&helper, addr, alternate, is32bits);
@@ -763,7 +775,7 @@ slow_path:
     insts_rsize = (insts_rsize+7)&~7;   // round the size...
     size_t native_size = (helper.native_size+7)&~7;   // round the size...
     // ok, now allocate mapped memory, with executable flag on
-    size_t sz = sizeof(void*) + native_size + helper.table64size*sizeof(uint64_t) + 4*sizeof(void*) + insts_rsize + sizeof(insts_rsize) + sizeof(block->isize);
+    size_t sz = sizeof(void*) + native_size + helper.table64size*sizeof(uint64_t) + 4*sizeof(void*) + insts_rsize + sizeof(native_size) + sizeof(insts_rsize) + sizeof(block->isize);
     //           dynablock_t*     block (arm insts)            table64               jmpnext code       instsize
     void* actual_p = (void*)AllocDynarecMap(sz);
     void* p = (void*)(((uintptr_t)actual_p) + sizeof(void*));
@@ -818,8 +830,9 @@ slow_path:
     block->always_test = helper.always_test;
     block->dirty = block->always_test;
     *(dynablock_t**)next = block;
-    *(size_t*)(instsize+insts_rsize) = insts_rsize;
-    *(int*)(instsize+insts_rsize+sizeof(insts_rsize)) = block->isize;
+    *(size_t *)(instsize + insts_rsize) = native_size;
+    *(size_t *)(instsize + insts_rsize + sizeof(native_size)) = insts_rsize;
+    *(int *)(instsize + insts_rsize + sizeof(native_size) + sizeof(insts_rsize)) = block->isize;
     *(void**)(next+3*sizeof(void*)) = native_next;
     CreateJmpNext(block->jmpnext, next+3*sizeof(void*));
     //block->x64_addr = (void*)start;

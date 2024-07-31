@@ -845,7 +845,7 @@ uintptr_t dynarec64_00_3(dynarec_rv64_t* dyn, uintptr_t addr, uintptr_t ip, int 
             INST_NAME("CALL Id");
             i32 = F32S;
             if(addr+i32==0) {
-                #if STEP == 3
+                #if STEP == 3 || STEP == 4
                 printf_log(LOG_INFO, "Warning, CALL to 0x0 at %p (%p)\n", (void*)addr, (void*)(addr-1));
                 #endif
             }
