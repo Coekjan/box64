@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "debug.h"
 #include "generated/cs2s-ccapi.h"
@@ -45,7 +46,7 @@ void cs2c_sync(const char* library, size_t guest_addr, const void* guest_code, s
 int cs2c_lookup(const char* library, size_t guest_addr, const void* guest_code, size_t guest_code_len, void* host_code_buf, size_t host_code_buf_len, size_t* host_code_len)
 {
     int ret;
-    if ((ret = cs2s_ro_lookup(cs2s_ro, library, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) != 0) {
+    if ((ret = cs2s_ro_lookup(cs2s_ro, library, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
         printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
     }
     return ret;
