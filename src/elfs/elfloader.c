@@ -1778,6 +1778,9 @@ EXPORT void PltResolver(x64emu_t* emu)
 const char *elf_path_from_addr(uintptr_t addr) {
     for (size_t i = 0; i < my_context->elfsize; i++) {
         elfheader_t *elf = my_context->elfs[i];
+        if (!elf) {
+            continue;
+        }
         if (addr >= elf->delta && addr < elf->delta + elf->memsz) {
             return elf->path;
         }
