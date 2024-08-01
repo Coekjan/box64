@@ -24,29 +24,30 @@ void cs2c_init(void)
     }
 }
 
-void cs2c_lib_attach(const char* const* libraries, size_t libraries_len)
+void cs2c_path_attach(const char* const* paths, size_t paths_len)
 {
-    if (cs2s_cmdq_libs_attach(cs2s_cmdq, libraries, libraries_len)) {
-        printf_log(LOG_NONE, "Failed to attach libraries to command queue client\n");
+    if (cs2s_cmdq_paths_attach(cs2s_cmdq, paths, paths_len)) {
+        printf_log(LOG_NONE, "Failed to attach paths to command queue client\n");
         exit(1);
     }
-    while (cs2s_ro_attach(cs2s_ro, libraries, libraries_len)) {
-        printf_log(LOG_NONE, "Failed to attach libraries to lookup router. Sleep for 1 second and retry\n");
+    while (cs2s_ro_attach(cs2s_ro, paths, paths_len)) {
+        printf_log(LOG_NONE, "Failed to attach paths to lookup router. Sleep for 1 second and retry\n");
         sleep(1);
     }
 }
 
-void cs2c_sync(const char* library, size_t guest_addr, const void* guest_code, size_t guest_code_len, const void* host_code, size_t host_code_len)
+void cs2c_sync(const char* path, size_t guest_addr, const void* guest_code, size_t guest_code_len, const void* host_code, size_t host_code_len)
 {
-    if (cs2s_cmdq_sync(cs2s_cmdq, library, guest_addr, guest_code, guest_code_len, host_code, host_code_len)) {
-        printf_log(LOG_NONE, "Failed to synchronize cache to command queue server\n");
+    int ret;
+    if ((ret = cs2s_cmdq_sync(cs2s_cmdq, path, guest_addr, guest_code, guest_code_len, host_code, host_code_len)) != 0) {
+        printf_log(LOG_NONE, "Failed to synchronize cache to command queue server: %d\n", ret);
     }
 }
 
-int cs2c_lookup(const char* library, size_t guest_addr, const void* guest_code, size_t guest_code_len, void* host_code_buf, size_t host_code_buf_len, size_t* host_code_len)
+int cs2c_lookup(const char* path, size_t guest_addr, const void* guest_code, size_t guest_code_len, void* host_code_buf, size_t host_code_buf_len, size_t* host_code_len)
 {
     int ret;
-    if ((ret = cs2s_ro_lookup(cs2s_ro, library, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
+    if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
         printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
     }
     return ret;

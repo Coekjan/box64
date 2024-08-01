@@ -2246,6 +2246,7 @@ int initialize(int argc, const char **argv, char** env, x64emu_t** emulator, elf
 
 #ifdef CS2
     cs2c_init();
+    cs2c_path_attach((const char *[]) { my_context->fullpath }, 1);
 #endif
 
     // pre-load lib if needed

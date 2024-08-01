@@ -97,4 +97,10 @@ void* GetNativeSymbolUnversioned(void* lib, const char* name);
 
 void AddMainElfToLinkmap(elfheader_t* lib);
 
+/** Get the path of the loaded ELF file that contains the given address.
+ * 
+ *  Returns NULL if the address is not in any loaded ELF file.
+ */
+const char *elf_path_from_addr(uintptr_t addr);
+
 #endif //__ELF_LOADER_H_
