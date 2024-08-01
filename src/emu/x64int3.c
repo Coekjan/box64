@@ -34,6 +34,10 @@
 #include "elfload_dump.h"
 #include "elfs/elfloader_private.h"
 
+#ifdef CS2
+#include "cs2c.h"
+#endif
+
 typedef int32_t (*iFpppp_t)(void*, void*, void*, void*);
 
 x64emu_t* x64emu_fork(x64emu_t* emu, int forktype)
@@ -66,6 +70,9 @@ x64emu_t* x64emu_fork(x64emu_t* emu, int forktype)
             waitpid(v, NULL, WEXITED);
         }
     } else if(v==0) {
+#ifdef CS2
+        cs2c_init();
+#endif
         ResetSegmentsCache(emu);
         // execute atforks child functions
         for (int i=0; i<my_context->atfork_sz; --i)
