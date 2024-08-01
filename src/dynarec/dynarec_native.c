@@ -694,7 +694,6 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
     }
 
 #ifdef CS2
-    // TODO: PER-LIB lookup!
     const char *elf_path = elf_path_from_addr(addr);
     if (elf_path) {
         uint32_t host_buf;
@@ -889,7 +888,6 @@ slow_path:
     current_helper = NULL;
     //block->done = 1;
 #ifdef CS2
-    // FIXME: PER-LIB Sync!
     if (elf_path) {
         cs2c_sync(elf_path, addr, (void*)addr, end - addr, p, sz - sizeof(void*));
     }
