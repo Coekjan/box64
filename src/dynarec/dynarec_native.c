@@ -685,12 +685,21 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
     }
     updateYmm0s(&helper, 0, 0);
 
+    // pass 1, float optimizations, first pass for flags
+    native_pass1(&helper, addr, alternate, is32bits);
+    if(helper.abort) {
+        if(box64_dynarec_dump || box64_dynarec_log)dynarec_log(LOG_NONE, "Abort dynablock on pass1\n");
+        CancelBlock64(0);
+        return NULL;
+    }
+
 #ifdef CS2
     // TODO: PER-LIB lookup!
-    if (addr >= 0x3f00000000 && addr < 0x3f0000a000) {
+    const char *elf_path = elf_path_from_addr(addr);
+    if (elf_path) {
         uint32_t host_buf;
         size_t host_sz = 0;
-        int ret = cs2c_lookup("/lib/libcap.so.2", addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
+        int ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
         if (ret == 0) {
             // Cache Hit
             printf_log(LOG_INFO, "CS2 Cache Hit: %p\n", (void*)addr);
@@ -708,7 +717,7 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         if (ret == 0) {
             memcpy(block->block, &host_buf, host_sz);
         } else {
-            if ((ret = cs2c_lookup("/lib/libcap.so.2", addr, (void*)addr, end - addr, block->block, host_sz, &host_sz)) != 0) {
+            if ((ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, block->block, host_sz, &host_sz)) != 0) {
                 printf_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
                 FreeDynarecMap((uintptr_t)actual_p);
                 goto slow_path;
@@ -720,7 +729,20 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         int isize = *(int*)(actual_p + sz - sizeof(block->isize));
         void *next = (actual_p + sz - sizeof(block->isize) - sizeof(size_t) - insts_rsize - 4 * sizeof(void*));
         void *tablestart = block->block + native_size;
+
         block->actual_block = actual_p;
+
+        helper.block = block->block;
+        helper.tablestart = (uintptr_t)tablestart;
+        helper.jmp_next = (uintptr_t)next + sizeof(void*);
+        helper.instsize = (instsize_t*)(next + 4 * sizeof(void*));
+        helper.table64cap = (next - tablestart) / sizeof(uint64_t);
+        helper.table64 = (uint64_t*)tablestart;
+        helper.native_size = 0;
+        helper.table64size = 0; // reset table64 (but not the cap)
+        helper.insts_size = 0;  // reset
+
+        native_pass4(&helper, addr, alternate, is32bits);
         block->size = sz;
         block->x64_addr = (void *)addr;
         block->x64_size = end - addr;
@@ -732,20 +754,10 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         block->isize = isize;
         block->instsize = next + 4 * sizeof(void*);
         block->jmpnext = next + sizeof(void*);
+
         *(dynablock_t**)next = block;
         *(void**)(next + 3 * sizeof(void*)) = native_next;
         CreateJmpNext(block->jmpnext, next + 3 * sizeof(void*));
-
-        helper.block = block->block;
-        helper.tablestart = (uintptr_t)tablestart;
-        helper.jmp_next = (uintptr_t)next + sizeof(void*);
-        helper.instsize = (instsize_t*)(block->instsize);
-        helper.table64cap = (next - tablestart) / sizeof(uint64_t);
-        helper.table64 = (uint64_t*)tablestart;
-        helper.native_size = 0;
-        helper.table64size = 0; // reset table64 (but not the cap)
-        helper.insts_size = 0;  // reset
-        native_pass4(&helper, addr, alternate, is32bits);
 
         __clear_cache(actual_p, actual_p + sz);
         current_helper = NULL;
@@ -754,14 +766,6 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
     }
 slow_path:
 #endif
-
-    // pass 1, float optimizations, first pass for flags
-    native_pass1(&helper, addr, alternate, is32bits);
-    if(helper.abort) {
-        if(box64_dynarec_dump || box64_dynarec_log)dynarec_log(LOG_NONE, "Abort dynablock on pass1\n");
-        CancelBlock64(0);
-        return NULL;
-    }
     
     // pass 2, instruction size
     native_pass2(&helper, addr, alternate, is32bits);
@@ -886,8 +890,8 @@ slow_path:
     //block->done = 1;
 #ifdef CS2
     // FIXME: PER-LIB Sync!
-    if (addr >= 0x3f00000000 && addr < 0x3f0000a000) {
-        cs2c_sync("/lib/libcap.so.2", addr, (void*)addr, end - addr, p, sz - sizeof(void*));
+    if (elf_path) {
+        cs2c_sync(elf_path, addr, (void*)addr, end - addr, p, sz - sizeof(void*));
     }
 #endif
     return (void*)block;
