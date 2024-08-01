@@ -702,10 +702,10 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         int ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
         if (ret == 0) {
             // Cache Hit
-            printf_log(LOG_INFO, "CS2 Cache Hit: %p\n", (void*)addr);
+            dynarec_log(LOG_INFO, "CS2 Cache Hit: %p\n", (void*)addr);
         } else if (ret == -ENOMEM) {
             // Cache Hit, but buffer too small
-            printf_log(LOG_INFO, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
+            dynarec_log(LOG_INFO, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
         } else {
             // Cache Miss
             goto slow_path;
@@ -718,11 +718,11 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
             memcpy(block->block, &host_buf, host_sz);
         } else {
             if ((ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, block->block, host_sz, &host_sz)) != 0) {
-                printf_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
+                dynarec_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
                 FreeDynarecMap((uintptr_t)actual_p);
                 goto slow_path;
             }
-            printf_log(LOG_INFO, "CS2 Cache Loaded: %p\n", (void*)addr);
+            dynarec_log(LOG_INFO, "CS2 Cache Loaded: %p\n", (void*)addr);
         }
         size_t native_size = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t) - sizeof(size_t));
         size_t insts_rsize = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t));
@@ -761,7 +761,7 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
 
         __clear_cache(actual_p, actual_p + sz);
         current_helper = NULL;
-        printf_log(LOG_INFO, "CS2 Done, block %p\n", (void*)block->block);
+        dynarec_log(LOG_INFO, "CS2 Done, block %p\n", (void*)block->block);
         return (void*)block->block;
     }
 slow_path:
