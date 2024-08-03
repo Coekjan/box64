@@ -495,6 +495,14 @@ static int static_jmps[MAX_INSTS+2];
 static uintptr_t static_next[MAX_INSTS+2];
 static uint64_t static_table64[(MAX_INSTS+3)/4];
 static instruction_native_t static_insts[MAX_INSTS+2] = {0};
+
+#ifdef CS2
+static int static_jmps_bkp[MAX_INSTS+2];
+static uintptr_t static_next_bkp[MAX_INSTS+2];
+static uint64_t static_table64_bkp[(MAX_INSTS+3)/4];
+static instruction_native_t static_insts_bkp[MAX_INSTS+2] = {0};
+#endif
+
 // TODO: ninst could be a uint16_t instead of an int, that could same some temp. memory
 
 void CancelBlock64(int need_lock)
@@ -541,6 +549,68 @@ void* CreateEmptyBlock(dynablock_t* block, uintptr_t addr) {
     __clear_cache(actual_p, actual_p+sz);   // need to clear the cache before execution...
     return block;
 }
+
+#ifdef CS2
+typedef struct {
+    size_t native_size;
+    size_t insts_rsize;
+    int block_isize;
+    uint8_t block_always_test;
+    uint8_t block_dirty;
+} cs2c_meta_t;
+
+#define DIFF(x) \
+    if(origin->x != cache->x) { \
+        diff = 1; \
+        dynarec_log(LOG_NONE,"'" #x "' mismatch: %x vs %x\n", (uintptr_t)origin->x, (uintptr_t)cache->x); \
+    }
+
+static void diff_block(uintptr_t addr, int alternate, dynablock_t* origin, size_t origin_sz, dynablock_t *cache, size_t cache_sz) {
+    int diff = 0;
+    
+    DIFF(previous)
+    DIFF(size)
+    DIFF(x64_addr)
+    DIFF(x64_size)
+    DIFF(hash)
+    DIFF(done)
+    DIFF(gone)
+    DIFF(always_test)
+    DIFF(dirty)
+    DIFF(isize)
+
+    if (origin->instsize->x64 != cache->instsize->x64) {
+        diff = 1;
+        dynarec_log(LOG_NONE, "instsize->x64 mismatch: %x vs %x\n", (uintptr_t)origin->instsize->x64, (uintptr_t)cache->instsize->x64);
+    }
+
+    if (origin->instsize->nat != cache->instsize->nat) {
+        diff = 1;
+        dynarec_log(LOG_NONE, "instsize->nat mismatch: %x vs %x\n", (uintptr_t)origin->instsize->nat, (uintptr_t)cache->instsize->nat);
+    }
+
+    if (origin_sz != cache_sz) {
+        diff = 1;
+        dynarec_log(LOG_NONE, "BLOCK SIZE mismatch: %zu vs %zu\n", origin_sz, cache_sz);
+    }
+
+    for (size_t i = 0; i < origin_sz && i < cache_sz; i += sizeof(uint32_t)) {
+        uint32_t o = *(uint32_t*)((uintptr_t)origin->actual_block + i);
+        uint32_t c = *(uint32_t*)((uintptr_t)cache->actual_block + i);
+        if (o != c) {
+            diff = 1;
+            dynarec_log(LOG_NONE, "BLOCK DATA mismatch at %zu/[%zu, %zu]: %x vs %x\n", i, origin_sz, cache_sz, o, c);
+        }
+    }
+
+    if (diff) {
+        dynarec_log(LOG_NONE, "%p (alt=%s): BLOCK DATA ERROR???? PLEASE CHECK!!!!\n", (void *)addr, alternate ? "true" : "false");
+    }
+}
+
+#undef DIFF
+
+#endif
 
 void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bits) {
     /*
@@ -695,20 +765,38 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
 
 #ifdef CS2
     const char *elf_path = elf_path_from_addr(addr);
-    if (elf_path) {
+    int cs2c_cache_hit = 0;
+    dynablock_t block_hit;
+    size_t block_hit_sz;
+    if (box64_cs2c && elf_path) {
         uint32_t host_buf;
         size_t host_sz = 0;
         int ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
         if (ret == 0) {
             // Cache Hit
-            dynarec_log(LOG_INFO, "CS2 Cache Hit: %p\n", (void*)addr);
+            dynarec_log(LOG_DEBUG, "CS2 Cache Hit: %p\n", (void*)addr);
         } else if (ret == -ENOMEM) {
             // Cache Hit, but buffer too small
-            dynarec_log(LOG_INFO, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
+            dynarec_log(LOG_DEBUG, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
         } else {
             // Cache Miss
             goto slow_path;
         }
+
+        dynarec_native_t helper_bkp;
+        dynablock_t block_bkp;
+        if (box64_cs2c_test) {
+            // on stack values backup
+            memcpy(&helper_bkp, &helper, sizeof(dynarec_native_t));
+            memcpy(&block_bkp, block, sizeof(dynablock_t));
+
+            // in data values backup
+            memcpy(static_jmps_bkp, static_jmps, sizeof(static_jmps));
+            memcpy(static_next_bkp, static_next, sizeof(static_next));
+            memcpy(static_table64_bkp, static_table64, sizeof(static_table64));
+            memcpy(static_insts_bkp, static_insts, sizeof(static_insts));
+        }
+
         size_t sz = host_sz + sizeof(void*);
         void *actual_p = (void*)AllocDynarecMap(sz);
         block->block = actual_p + sizeof(void*);
@@ -721,12 +809,15 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
                 FreeDynarecMap((uintptr_t)actual_p);
                 goto slow_path;
             }
-            dynarec_log(LOG_INFO, "CS2 Cache Loaded: %p\n", (void*)addr);
+            dynarec_log(LOG_DEBUG, "CS2 Cache Loaded: %p\n", (void*)addr);
         }
-        size_t native_size = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t) - sizeof(size_t));
-        size_t insts_rsize = *(size_t*)(actual_p + sz - sizeof(block->isize) - sizeof(size_t));
-        int isize = *(int*)(actual_p + sz - sizeof(block->isize));
-        void *next = (actual_p + sz - sizeof(block->isize) - sizeof(size_t) - insts_rsize - 4 * sizeof(void*));
+        cs2c_meta_t *cs2c_meta = (cs2c_meta_t*)(actual_p + sz - sizeof(cs2c_meta_t));
+
+        size_t native_size = cs2c_meta->native_size;
+        size_t insts_rsize = cs2c_meta->insts_rsize;
+        int isize = cs2c_meta->block_isize;
+
+        void *next = ((void *)cs2c_meta - insts_rsize - 4 * sizeof(void*));
         void *tablestart = block->block + native_size;
 
         block->actual_block = actual_p;
@@ -748,8 +839,8 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         block->hash = hash;
         // block->done
         // block->gone
-        // block->always_test
-        // block->dirty
+        block->always_test = cs2c_meta->block_always_test;
+        block->dirty = cs2c_meta->block_dirty;
         block->isize = isize;
         block->instsize = next + 4 * sizeof(void*);
         block->jmpnext = next + sizeof(void*);
@@ -758,9 +849,25 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         *(void**)(next + 3 * sizeof(void*)) = native_next;
         CreateJmpNext(block->jmpnext, next + 3 * sizeof(void*));
 
+        cs2c_cache_hit = 1;
+        if (box64_cs2c_test) {
+            block_hit = *block;
+            block_hit_sz = sz;
+            // recover helper and block
+            memcpy(&helper, &helper_bkp, sizeof(dynarec_native_t));
+            memcpy(block, &block_bkp, sizeof(dynablock_t));
+
+            // recover static values
+            memcpy(static_jmps, static_jmps_bkp, sizeof(static_jmps));
+            memcpy(static_next, static_next_bkp, sizeof(static_next));
+            memcpy(static_table64, static_table64_bkp, sizeof(static_table64));
+            memcpy(static_insts, static_insts_bkp, sizeof(static_insts));
+            goto slow_path;
+        }
+
         __clear_cache(actual_p, actual_p + sz);
         current_helper = NULL;
-        dynarec_log(LOG_INFO, "CS2 Done, block %p\n", (void*)block->block);
+        dynarec_log(LOG_DEBUG, "CS2 Done, block %p\n", (void*)block->block);
         return (void*)block->block;
     }
 slow_path:
@@ -778,13 +885,19 @@ slow_path:
     insts_rsize = (insts_rsize+7)&~7;   // round the size...
     size_t native_size = (helper.native_size+7)&~7;   // round the size...
     // ok, now allocate mapped memory, with executable flag on
-    size_t sz = sizeof(void*) + native_size + helper.table64size*sizeof(uint64_t) + 4*sizeof(void*) + insts_rsize + sizeof(native_size) + sizeof(insts_rsize) + sizeof(block->isize);
+    size_t sz = sizeof(void*) + native_size + helper.table64size*sizeof(uint64_t) + 4*sizeof(void*) + insts_rsize;
     //           dynablock_t*     block (arm insts)            table64               jmpnext code       instsize
+#ifdef CS2
+    sz += sizeof(cs2c_meta_t);
+#endif
     void* actual_p = (void*)AllocDynarecMap(sz);
     void* p = (void*)(((uintptr_t)actual_p) + sizeof(void*));
     void* tablestart = p + native_size;
     void* next = tablestart + helper.table64size*sizeof(uint64_t);
     void* instsize = next + 4*sizeof(void*);
+#ifdef CS2
+    cs2c_meta_t *cs2c_meta = (cs2c_meta_t*)((uintptr_t)instsize + insts_rsize);
+#endif
     if(actual_p==NULL) {
         dynarec_log(LOG_INFO, "AllocDynarecMap(%p, %zu) failed, canceling block\n", block, sz);
         CancelBlock64(0);
@@ -832,10 +945,12 @@ slow_path:
     block->jmpnext = next+sizeof(void*);
     block->always_test = helper.always_test;
     block->dirty = block->always_test;
+#ifdef CS2
+    cs2c_meta->native_size = native_size;
+    cs2c_meta->insts_rsize = insts_rsize;
+    cs2c_meta->block_isize = block->isize;
+#endif
     *(dynablock_t**)next = block;
-    *(size_t *)(instsize + insts_rsize) = native_size;
-    *(size_t *)(instsize + insts_rsize + sizeof(native_size)) = insts_rsize;
-    *(int *)(instsize + insts_rsize + sizeof(native_size) + sizeof(insts_rsize)) = block->isize;
     *(void**)(next+3*sizeof(void*)) = native_next;
     CreateJmpNext(block->jmpnext, next+3*sizeof(void*));
     //block->x64_addr = (void*)start;
@@ -887,8 +1002,15 @@ slow_path:
     }
     current_helper = NULL;
     //block->done = 1;
+
 #ifdef CS2
-    if (elf_path) {
+    cs2c_meta->block_always_test = block->always_test;
+    cs2c_meta->block_dirty = block->dirty;
+    if (box64_cs2c_test && cs2c_cache_hit) {
+        diff_block(addr, alternate, &block_hit, block_hit_sz, block, sz);
+        // FREE block hit?
+    }
+    if (box64_cs2c && elf_path && !cs2c_cache_hit) {
         cs2c_sync(elf_path, addr, (void*)addr, end - addr, p, sz - sizeof(void*));
     }
 #endif
