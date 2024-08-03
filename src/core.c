@@ -48,6 +48,8 @@ box64context_t *my_context = NULL;
 int box64_quit = 0;
 int box64_exit_code = 0;
 int box64_log = LOG_INFO; //LOG_NONE;
+int box64_cs2c = 1;
+int box64_cs2c_test = 0;
 int box64_dump = 0;
 int box64_nobanner = 0;
 int box64_dynarec_log = LOG_NONE;
@@ -609,6 +611,21 @@ void LoadLogEnv()
         }
         if(!box64_nobanner)
             printf_log(LOG_INFO, "Debug level is %d\n", box64_log);
+    }
+
+    p = getenv("BOX64_CS2C");
+    if(p) {
+        if(strlen(p)==1) {
+            if(p[0]>='0' && p[0]<='1')
+                box64_cs2c = p[0]-'0';
+        }
+        if(box64_cs2c)
+            printf_log(LOG_INFO, "CS2C mode is ON\n");
+    }
+
+    p = getenv("BOX64_CS2C_TEST");
+    if (p) {
+        box64_cs2c_test = 1;
     }
 
 #if !defined(DYNAREC) && (defined(ARM64) || defined(RV64) || defined(LA64))

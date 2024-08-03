@@ -749,9 +749,12 @@ if(CS2)
         WORKING_DIRECTORY "${CS2S_ROOT}"
     )
     add_custom_command(
-        # FIXME: Check if cargo & cross is installed
+        # FIXME: Check if cargo is installed
         OUTPUT "${CS2S_CCAPI_DIR}/libcs2s_ccapi.so"
-        COMMAND "cross" "build" "--package=cs2s-ccapi" "--target=${RUST_TARGET}" "${CS2S_CARGO_FLAGS}"
+        COMMAND "cargo" "build" "--package=cs2s-ccapi"
+                                "--target=${RUST_TARGET}"
+                                "${CS2S_CARGO_PROFILE}"
+                                "--config=target.${RUST_TARGET}.linker=\\\"${CMAKE_C_COMPILER}\\\""
         MAIN_DEPENDENCY "${BOX64_ROOT}/cs2s/Cargo.toml"
         WORKING_DIRECTORY "${BOX64_ROOT}/cs2s"
     )

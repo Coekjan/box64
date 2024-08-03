@@ -18,7 +18,7 @@ void cs2c_init(void)
         printf_log(LOG_NONE, "Failed to connect to command queue server\n");
         exit(1);
     }
-    if (cs2s_ro_create("develop", true, &cs2s_ro)) {
+    if (cs2s_ro_create("develop", false, &cs2s_ro)) {
         printf_log(LOG_NONE, "Failed to create lookup router\n");
         exit(1);
     }
@@ -50,6 +50,7 @@ int cs2c_lookup(const char* path, size_t guest_addr, const void* guest_code, siz
     if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
         printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
     }
+    return ret;
     if (ret == -0x80000000) {
         cs2c_path_attach((const char *[]) { path }, 1);
         if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
