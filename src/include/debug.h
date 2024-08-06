@@ -5,6 +5,7 @@
 typedef struct box64context_s box64context_t;
 extern int box64_log;    // log level
 extern int box64_cs2c;
+extern int box64_cs2c_mark;
 extern int box64_cs2c_test;
 extern int box64_dump;   // dump elf or not
 extern int box64_dynarec_log;
