@@ -49,6 +49,7 @@ int box64_quit = 0;
 int box64_exit_code = 0;
 int box64_log = LOG_INFO; //LOG_NONE;
 int box64_cs2c = 1;
+int box64_cs2c_mark = 1024;
 int box64_cs2c_test = 0;
 int box64_dump = 0;
 int box64_nobanner = 0;
@@ -621,6 +622,14 @@ void LoadLogEnv()
         }
         if(box64_cs2c)
             printf_log(LOG_INFO, "CS2C mode is ON\n");
+    }
+
+    p = getenv("BOX64_CS2C_MARK");
+    if (p) {
+        int mark = atoi(p);
+        if (mark > 0) {
+            box64_cs2c_mark = mark;
+        }
     }
 
     p = getenv("BOX64_CS2C_TEST");

@@ -10,16 +10,17 @@ static LookupRouterPtr cs2s_ro;
 
 void cs2c_init(void)
 {
-    if (cs2s_cmdq_create("develop", &cs2s_cmdq)) {
-        printf_log(LOG_NONE, "Failed to create command queue client\n");
+    int ret;
+    if ((ret = cs2s_cmdq_create("develop", &cs2s_cmdq)) != 0) {
+        printf_log(LOG_NONE, "Failed to create command queue client: %d\n", ret);
         exit(1);
     }
-    if (cs2s_cmdq_connect(cs2s_cmdq)) {
-        printf_log(LOG_NONE, "Failed to connect to command queue server\n");
+    if ((ret = cs2s_cmdq_connect(cs2s_cmdq)) != 0) {
+        printf_log(LOG_NONE, "Failed to connect to command queue server: %d\n", ret);
         exit(1);
     }
-    if (cs2s_ro_create("develop", &cs2s_ro)) {
-        printf_log(LOG_NONE, "Failed to create lookup router\n");
+    if ((ret = cs2s_ro_create("develop", &cs2s_ro)) != 0) {
+        printf_log(LOG_NONE, "Failed to create lookup router: %d\n", ret);
         exit(1);
     }
 }
