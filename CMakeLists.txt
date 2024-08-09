@@ -753,6 +753,7 @@ if(CS2)
         OUTPUT "${CS2S_CCAPI_DIR}/libcs2s_ccapi.so"
         COMMAND "cargo" "build" "--package=cs2s-ccapi"
                                 "--target=${RUST_TARGET}"
+                                "--target-dir=${CS2S_CCAPI_DIR}"
                                 "${CS2S_CARGO_PROFILE}"
                                 "--config=target.${RUST_TARGET}.linker=\\\"${CMAKE_C_COMPILER}\\\""
         MAIN_DEPENDENCY "${BOX64_ROOT}/cs2s/Cargo.toml"
