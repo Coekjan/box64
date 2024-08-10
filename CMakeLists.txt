@@ -948,6 +948,7 @@ if(DYNAREC)
         set_target_properties(native_pass4 PROPERTIES COMPILE_FLAGS "-DSTEP=4")
         add_dependencies(native_pass4 WRAPPERS)
 
+        add_dependencies(dynarec_native CS2S)
         add_dependencies(native_pass0 CS2S)
         add_dependencies(native_pass1 CS2S)
         add_dependencies(native_pass2 CS2S)
