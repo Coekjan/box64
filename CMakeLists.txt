@@ -844,10 +844,10 @@ if(CS2)
     add_custom_command(
         OUTPUT "${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
         # FIXME: Check if cbindgen is installed
-        COMMAND "cbindgen" "--config=${CS2S_ROOT}/cbindgen.toml"
+        COMMAND "cbindgen" "--config=${CS2S_ROOT}/crates/cs2s-ccapi/cbindgen.toml"
                         "--crate=cs2s-ccapi"
                         "--output=${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
-        MAIN_DEPENDENCY "${CS2S_ROOT}/cbindgen.toml"
+        MAIN_DEPENDENCY "${CS2S_ROOT}/crates/cs2s-ccapi/cbindgen.toml"
         WORKING_DIRECTORY "${CS2S_ROOT}"
     )
     add_custom_command(

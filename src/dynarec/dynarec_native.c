@@ -553,6 +553,7 @@ void* CreateEmptyBlock(dynablock_t* block, uintptr_t addr) {
 #ifdef CS2
 typedef struct {
     size_t native_size;
+    size_t table64_size;
     size_t insts_rsize;
     int block_isize;
     uint8_t block_always_test;
@@ -771,22 +772,36 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
     if (!cs2c_with_fast_path) {
         goto slow_path;
     }
-    const char *elf_path = elf_path_from_addr(addr);
+    const char* elf_path = elf_path_from_addr(addr);
     cs2c_with_fast_path = elf_path != NULL;
+    CodeSignBuf code_sign_buf;
     if (cs2c_with_fast_path) {
-        uint32_t host_buf;
-        size_t host_sz = 0;
-        int ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, &host_buf, sizeof(host_buf), &host_sz);
-        if (ret == 0) {
-            // Cache Hit
-            dynarec_log(LOG_DEBUG, "CS2 Cache Hit: %p\n", (void*)addr);
-        } else if (ret == -ENOMEM) {
-            // Cache Hit, but buffer too small
-            dynarec_log(LOG_DEBUG, "CS2 Cache Hit, but buffer too small: %p, expect buf size=%d\n", (void*)addr, host_sz);
-        } else {
-            // Cache Miss
+        int ret;
+        if ((ret = cs2c_calc_sign((void*)addr, end - addr, &code_sign_buf)) < 0) {
+            dynarec_log(LOG_NONE, "CS2 Failed to calculate sign: %d\n", ret);
             goto slow_path;
         }
+
+        const cs2c_meta_t* host_meta;
+        size_t host_meta_size;
+        const void* host_code;
+        size_t host_code_size;
+        ret = cs2c_lookup(elf_path, addr, end - addr, &code_sign_buf, (const void **)&host_meta, &host_meta_size, &host_code, &host_code_size);
+        switch (ret) {
+            case 0:
+                // Cache Hit
+                dynarec_log(LOG_DEBUG, "CS2 Cache Hit: %p\n", (void*)addr);
+                break;
+            case -ENOENT:
+                // Cache Miss
+                goto slow_path;
+            default:
+                // Error
+                dynarec_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
+                goto slow_path;
+        }
+        assert(host_meta_size == sizeof(cs2c_meta_t));
+        assert(host_code_size == host_meta->native_size);
 
         dynarec_native_t helper_bkp;
         dynablock_t block_bkp;
@@ -802,30 +817,16 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
             memcpy(static_insts_bkp, static_insts, sizeof(static_insts));
         }
 
-        size_t sz = host_sz + sizeof(void*);
-        void *actual_p = (void*)AllocDynarecMap(sz);
+        size_t sz = sizeof(void*) + host_meta->native_size + host_meta->table64_size * sizeof(uint64_t) + 4 * sizeof(void*) + host_meta->insts_rsize;
+        void *actual_p = (void *)AllocDynarecMap(sz);
         block->block = actual_p + sizeof(void*);
-        *(dynablock_t**)actual_p = block;
-        if (ret == 0) {
-            memcpy(block->block, &host_buf, host_sz);
-        } else {
-            if ((ret = cs2c_lookup(elf_path, addr, (void*)addr, end - addr, block->block, host_sz, &host_sz)) != 0) {
-                dynarec_log(LOG_NONE, "CS2 Failed to lookup: %d\n", ret);
-                FreeDynarecMap((uintptr_t)actual_p);
-                goto slow_path;
-            }
-            dynarec_log(LOG_DEBUG, "CS2 Cache Loaded: %p\n", (void*)addr);
-        }
-        cs2c_meta_t *cs2c_meta = (cs2c_meta_t*)(actual_p + sz - sizeof(cs2c_meta_t));
+        *(dynablock_t **)actual_p = block;
 
-        size_t native_size = cs2c_meta->native_size;
-        size_t insts_rsize = cs2c_meta->insts_rsize;
-        int isize = cs2c_meta->block_isize;
-
-        void *next = ((void *)cs2c_meta - insts_rsize - 4 * sizeof(void*));
-        void *tablestart = block->block + native_size;
+        memcpy(block->block, host_code, host_code_size);
 
         block->actual_block = actual_p;
+        void *tablestart = block->block + host_meta->native_size;
+        void *next = tablestart + host_meta->table64_size * sizeof(uint64_t);
 
         helper.block = block->block;
         helper.tablestart = (uintptr_t)tablestart;
@@ -839,14 +840,12 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
 
         native_pass4(&helper, addr, alternate, is32bits);
         block->size = sz;
-        block->x64_addr = (void *)addr;
+        block->x64_addr = (void*)addr;
         block->x64_size = end - addr;
         block->hash = hash;
-        // block->done
-        // block->gone
-        block->always_test = cs2c_meta->block_always_test;
-        block->dirty = cs2c_meta->block_dirty;
-        block->isize = isize;
+        block->always_test = host_meta->block_always_test;
+        block->dirty = host_meta->block_dirty;
+        block->isize = host_meta->block_isize;
         block->instsize = next + 4 * sizeof(void*);
         block->jmpnext = next + sizeof(void*);
 
@@ -876,8 +875,9 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         return (void*)block->block;
     }
 slow_path:
+
+    cs2c_meta_t host_metadata;
 #endif
-    
     // pass 2, instruction size
     native_pass2(&helper, addr, alternate, is32bits);
     if(helper.abort) {
@@ -894,7 +894,7 @@ slow_path:
     //           dynablock_t*     block (arm insts)            table64               jmpnext code       instsize
 #ifdef CS2
     if (cs2c_with_fast_path) {
-        sz += sizeof(cs2c_meta_t);
+        host_metadata.table64_size = helper.table64size;
     }
 #endif
     void* actual_p = (void*)AllocDynarecMap(sz);
@@ -902,12 +902,6 @@ slow_path:
     void* tablestart = p + native_size;
     void* next = tablestart + helper.table64size*sizeof(uint64_t);
     void* instsize = next + 4*sizeof(void*);
-#ifdef CS2
-    cs2c_meta_t *cs2c_meta = NULL;
-    if (cs2c_with_fast_path) {
-        cs2c_meta = (cs2c_meta_t*)((uintptr_t)instsize + insts_rsize);
-    }
-#endif
     if(actual_p==NULL) {
         dynarec_log(LOG_INFO, "AllocDynarecMap(%p, %zu) failed, canceling block\n", block, sz);
         CancelBlock64(0);
@@ -957,9 +951,9 @@ slow_path:
     block->dirty = block->always_test;
 #ifdef CS2
     if (cs2c_with_fast_path) {
-        cs2c_meta->native_size = native_size;
-        cs2c_meta->insts_rsize = insts_rsize;
-        cs2c_meta->block_isize = block->isize;
+        host_metadata.native_size = native_size;
+        host_metadata.insts_rsize = insts_rsize;
+        host_metadata.block_isize = block->isize;
     }
 #endif
     *(dynablock_t**)next = block;
@@ -1019,12 +1013,12 @@ slow_path:
     if (cs2c_with_fast_path) {
         if (box64_cs2c_test && cs2c_cache_hit) {
             diff_block(addr, alternate, &block_hit, block_hit_sz, block, sz);
-            // FREE block hit?
+            // FIXME: FREE block hit?
         }
         if (!cs2c_cache_hit) {
-            cs2c_meta->block_always_test = block->always_test;
-            cs2c_meta->block_dirty = block->dirty;
-            cs2c_sync(elf_path, addr, (void*)addr, end - addr, p, sz - sizeof(void*));
+            host_metadata.block_always_test = block->always_test;
+            host_metadata.block_dirty = block->dirty;
+            cs2c_sync(elf_path, addr, end - addr, &code_sign_buf, &host_metadata, sizeof(host_metadata), p, host_metadata.native_size);
         }
     }
 #endif

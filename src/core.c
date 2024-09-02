@@ -632,7 +632,7 @@ void LoadLogEnv()
     p = getenv("BOX64_CS2C_MARK");
     if (p) {
         int mark = atoi(p);
-        if (mark > 0) {
+        if (mark >= 0) {
             box64_cs2c_mark = mark;
         }
     }

@@ -11,7 +11,7 @@ static LookupRouterPtr cs2s_ro;
 void cs2c_init(void)
 {
     int ret;
-    if ((ret = cs2s_cmdq_create("develop", &cs2s_cmdq)) != 0) {
+    if ((ret = cs2s_cmdq_create("box64", &cs2s_cmdq)) != 0) {
         printf_log(LOG_NONE, "Failed to create command queue client: %d\n", ret);
         exit(1);
     }
@@ -19,7 +19,7 @@ void cs2c_init(void)
         printf_log(LOG_NONE, "Failed to connect to command queue server: %d\n", ret);
         exit(1);
     }
-    if ((ret = cs2s_ro_create("develop", &cs2s_ro)) != 0) {
+    if ((ret = cs2s_ro_create("box64", &cs2s_ro)) != 0) {
         printf_log(LOG_NONE, "Failed to create lookup router: %d\n", ret);
         exit(1);
     }
@@ -32,32 +32,53 @@ void cs2c_path_attach(const char* const* paths, size_t paths_len)
         exit(1);
     }
     while (cs2s_ro_attach(cs2s_ro, paths, paths_len)) {
-        printf_log(LOG_NONE, "Failed to attach paths to lookup router. Sleep for 1 second and retry\n");
-        sleep(1);
+        printf_log(LOG_DEBUG, "Failed to attach paths to lookup router. Sleep for 50 ms and retry\n");
+        usleep(50000);
     }
 }
 
-void cs2c_sync(const char* path, size_t guest_addr, const void* guest_code, size_t guest_code_len, const void* host_code, size_t host_code_len)
+void cs2c_sync(
+    const char* path,
+    size_t guest_addr,
+    size_t guest_size,
+    const CodeSignBuf* guest_sign,
+    const void* host_meta,
+    size_t host_meta_len,
+    const void* host_code,
+    size_t host_code_len)
 {
     int ret;
-    if ((ret = cs2s_cmdq_sync(cs2s_cmdq, path, guest_addr, guest_code, guest_code_len, host_code, host_code_len)) != 0) {
+    if ((ret = cs2s_cmdq_sync(cs2s_cmdq, path, guest_addr, guest_size, guest_sign, host_meta, host_meta_len, host_code, host_code_len)) != 0) {
         printf_log(LOG_NONE, "Failed to synchronize cache to command queue server: %d\n", ret);
     }
 }
 
-int cs2c_lookup(const char* path, size_t guest_addr, const void* guest_code, size_t guest_code_len, void* host_code_buf, size_t host_code_buf_len, size_t* host_code_len)
+int cs2c_lookup(
+    const char* path,
+    size_t guest_addr,
+    size_t guest_size,
+    const CodeSignBuf* guest_sign,
+    const void** host_meta_ptr,
+    size_t* host_meta_size,
+    const void** host_code_ptr,
+    size_t* host_code_size)
 {
     int ret;
-    if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
+    if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_size, guest_sign, host_meta_ptr, host_meta_size, host_code_ptr, host_code_size)) == -EINVAL) {
         printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
     }
     if (ret == -0x80000000) {
-        cs2c_path_attach((const char *[]) { path }, 1);
-        if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_code, guest_code_len, host_code_buf, host_code_buf_len, host_code_len)) == -EINVAL) {
+        cs2c_path_attach((const char*[]) { path }, 1);
+        if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_addr, guest_size, guest_sign, host_meta_ptr, host_meta_size, host_code_ptr, host_code_size)) == -EINVAL) {
             printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
         }
     }
     return ret;
+}
+
+int cs2c_calc_sign(const void* guest_code, size_t guest_size, CodeSignBuf* guest_sign)
+{
+    return cs2s_helper_calc_sign(guest_code, guest_size, guest_sign);
 }
 
 void cs2c_exit(void)
