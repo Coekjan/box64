@@ -81,6 +81,11 @@ int cs2c_calc_sign(const void* guest_code, size_t guest_size, CodeSign* guest_si
     return cs2s_helper_calc_sign(guest_code, guest_size, guest_sign);
 }
 
+int cs2c_test_sign(const CodeSign* sign1, const CodeSign* sign2)
+{
+    return cs2s_helper_test_sign(sign1, sign2);
+}
+
 const void* cs2c_block_code(const CacheBlockHeader* block)
 {
     return cs2s_helper_block_code(block);
@@ -93,7 +98,17 @@ const void* cs2c_block_meta(const CacheBlockHeader* block)
 
 int cs2c_for_each_blocks(const char* path, void* data, void (*callback)(void*, const CacheBlockHeader*))
 {
-    return cs2s_ro_for_each_blocks(cs2s_ro, path, data, callback);
+    int ret;
+    if ((ret = cs2s_ro_for_each_blocks(cs2s_ro, path, data, callback)) == -EINVAL) {
+        printf_log(LOG_NONE, "Failed to iterate blocks in lookup router: %d\n", ret);
+    }
+    if (ret == -0x80000000) {
+        cs2c_path_attach((const char*[]) { path }, 1);
+        if ((ret = cs2s_ro_for_each_blocks(cs2s_ro, path, data, callback)) == -EINVAL) {
+            printf_log(LOG_NONE, "Failed to iterate blocks in lookup router: %d\n", ret);
+        }
+    }
+    return ret;
 }
 
 void cs2c_exit(void)

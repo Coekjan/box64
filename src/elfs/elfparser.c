@@ -393,7 +393,10 @@ elfheader_t* ParseElfHeader64(FILE* f, const char* name, int exec)
         LoadNamedSection(f, h->SHEntries._64, h->numSHEntries, h->SHStrTab, ".dynstr", "DynSym Strings", SHT_STRTAB, (void**)&h->DynStr, NULL);
         LoadNamedSection(f, h->SHEntries._64, h->numSHEntries, h->SHStrTab, ".dynsym", "DynSym", SHT_DYNSYM, (void**)&h->DynSym, &h->numDynSym);
     }
-    
+
+#ifdef CS2
+    h->preloaded = 0;
+#endif
     return h;
 }
 

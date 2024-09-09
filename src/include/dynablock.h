@@ -1,10 +1,23 @@
 #ifndef __DYNABLOCK_H_
 #define __DYNABLOCK_H_
 
+#include <stdint.h>
+#include <setjmp.h>
+
+#include "../emu/x64emu_private.h"
+
 typedef struct x64emu_s x64emu_t;
 typedef struct dynablock_s dynablock_t;
 
+extern __thread JUMPBUFF dynarec_jmpbuf;
+#ifdef ANDROID
+#define DYN_JMPBUF dynarec_jmpbuf
+#else
+#define DYN_JMPBUF &dynarec_jmpbuf
+#endif
+
 uint32_t X31_hash_code(void* addr, int len);
+dynablock_t *AddNewDynablock(uintptr_t addr);
 void FreeDynablock(dynablock_t* db, int need_lock);
 void MarkDynablock(dynablock_t* db);
 void MarkRangeDynablock(dynablock_t* db, uintptr_t addr, uintptr_t size);

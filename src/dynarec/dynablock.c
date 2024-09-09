@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -26,6 +27,10 @@
 #include "custommem.h"
 #include "khash.h"
 #include "rbtree.h"
+
+#ifdef CS2
+#include <cs2c.h>
+#endif
 
 uint32_t X31_hash_code(void* addr, int len)
 {
@@ -178,7 +183,7 @@ dynablock_t *AddNewDynablock(uintptr_t addr)
 }
 
 //TODO: move this to dynrec_arm.c and track allocated structure to avoid memory leak
-static __thread JUMPBUFF dynarec_jmpbuf;
+__thread JUMPBUFF dynarec_jmpbuf;
 #ifdef ANDROID
 #define DYN_JMPBUF dynarec_jmpbuf
 #else
@@ -196,6 +201,9 @@ void cancelFillBlock()
 */
 static dynablock_t* internalDBGetBlock(x64emu_t* emu, uintptr_t addr, uintptr_t filladdr, int create, int need_lock, int is32bits)
 {
+#ifdef CS2
+begin:
+#endif
     if(hasAlternate((void*)addr))
         return NULL;
     dynablock_t* block = getDB(addr);
@@ -215,7 +223,47 @@ static dynablock_t* internalDBGetBlock(x64emu_t* emu, uintptr_t addr, uintptr_t 
             return block;
         }
     }
-    
+
+#ifdef CS2
+    if (elf_test_and_set_preloaded_from_addr(addr) == 0) {
+        // For each cached guest code block:
+        // 1. Check if the block is already in DB. If it is, skip it.
+        // 2. Check if it is identical to the block at the same address. If it is not, skip it.
+        // 3. Create a new dynablock according to the cache block, record the start/end address
+        //    of the block. Note that **do not flush icache**.
+        // 
+        // After all cached blocks are processed, flush icache for the range of start/end address.
+
+        const char* elf_path = elf_path_from_addr(addr);
+        assert(elf_path != NULL);
+
+        // Preload: Step 1, 2, 3.
+        cs2c_preload_ctx ctx = (cs2c_preload_ctx) {
+            .elf_path = elf_path,
+            .is32bits = is32bits,
+            .need_lock = need_lock,
+            .count = 0,
+            .start = NULL,
+            .end = NULL,
+        };
+        cs2c_for_each_blocks(elf_path, &ctx, PreloadBlock64);
+
+        // Flush icache.
+        if (ctx.start != NULL && ctx.end != NULL) {
+            assert(ctx.start <= ctx.end);
+            __clear_cache(ctx.start, ctx.end);
+            printf_log(LOG_INFO, "Preload %d blocks for %s\n", ctx.count, elf_path);
+        }
+
+        // Release the lock and go back to the beginning.
+        if (need_lock) {
+            mutex_unlock(&my_context->mutex_dyndump);
+        }
+
+        goto begin;
+    }
+#endif
+
     block = AddNewDynablock(addr);
 
     // fill the block

@@ -110,4 +110,13 @@ void AddMainElfToLinkmap(elfheader_t* lib);
  */
 const char *elf_info_from_addr(uintptr_t addr, uintptr_t *delta);
 
+/** Test-and-set the preloaded flag of the ELF file that contains the given address.
+ * 
+ * Returns:
+ * - `0` indicates that preloading is needed.
+ * - `1` indicates that preloading is not needed.
+ * - `-1` indicates that the address is not in any loaded ELF file.
+ */
+int elf_test_and_set_preloaded_from_addr(uintptr_t addr);
+
 #endif //__ELF_LOADER_H_

@@ -143,6 +143,9 @@ typedef struct elfheader_s {
     int                 clean_sz;
     int                 clean_cap;
 
+#ifdef CS2
+    int         preloaded; // whether the cache of this elf has been preloaded
+#endif
 } elfheader_t;
 
 #define R_X86_64_NONE           0       /* No reloc */

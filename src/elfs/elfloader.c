@@ -1912,3 +1912,24 @@ const char *elf_info_from_addr(uintptr_t addr, uintptr_t *delta) {
     }
     return NULL;
 }
+
+int elf_test_and_set_preloaded_from_addr(uintptr_t addr) {
+    for (size_t i = 0; i < my_context->elfsize; i++) {
+        elfheader_t *elf = my_context->elfs[i];
+        if (!elf) {
+            continue;
+        }
+        if (addr >= elf->delta && addr < elf->delta + elf->memsz) {
+            int prev = __atomic_test_and_set(&elf->preloaded, __ATOMIC_ACQ_REL);
+            if (prev) {
+                // `1` means preloading is not needed
+                return 1;
+            } else {
+                // `0` means preloading is needed
+                return 0;
+            }
+        }
+    }
+    // `-1` means the elf is not found
+    return -1;
+}
