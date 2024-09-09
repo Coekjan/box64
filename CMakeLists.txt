@@ -842,21 +842,13 @@ endif()
 
 if(CS2)
     add_custom_command(
-        OUTPUT "${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
-        # FIXME: Check if cbindgen is installed
-        COMMAND "cbindgen" "--config=${CS2S_ROOT}/crates/cs2s-ccapi/cbindgen.toml"
-                        "--crate=cs2s-ccapi"
-                        "--output=${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
-        MAIN_DEPENDENCY "${CS2S_ROOT}/crates/cs2s-ccapi/cbindgen.toml"
-        WORKING_DIRECTORY "${CS2S_ROOT}"
-    )
-    add_custom_command(
-        # FIXME: Check if cargo is installed
+        # FIXME: Check if the rust toolchain is installed
         OUTPUT "${CS2S_CCAPI_DIR}/libcs2s_ccapi.so"
-        COMMAND "cargo" "build" "--package=cs2s-ccapi"
+               "${BOX64_ROOT}/src/include/generated/cs2s-ccapi.h"
+        COMMAND ${CMAKE_COMMAND} -E env "CS2S_CCAPI_HEADER_DIR=${BOX64_ROOT}/src/include/generated"
+                "cargo" "build" "--package=cs2s-ccapi"
                                 "--target=${RUST_TARGET}"
                                 "${CS2S_CARGO_PROFILE}"
-                                "--config=target.${RUST_TARGET}.linker=\\\"${CMAKE_C_COMPILER}\\\""
         MAIN_DEPENDENCY "${BOX64_ROOT}/cs2s/Cargo.toml"
         WORKING_DIRECTORY "${BOX64_ROOT}/cs2s"
     )

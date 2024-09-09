@@ -48,9 +48,13 @@ box64context_t *my_context = NULL;
 int box64_quit = 0;
 int box64_exit_code = 0;
 int box64_log = LOG_INFO; //LOG_NONE;
+
+#ifdef CS2
 int box64_cs2c = 1;
 int box64_cs2c_mark = 1024;
 int box64_cs2c_test = 0;
+#endif
+
 int box64_dump = 0;
 int box64_nobanner = 0;
 int box64_dynarec_log = LOG_NONE;
@@ -619,6 +623,7 @@ void LoadLogEnv()
             printf_log(LOG_INFO, "Debug level is %d\n", box64_log);
     }
 
+#ifdef CS2
     p = getenv("BOX64_CS2C");
     if(p) {
         if(strlen(p)==1) {
@@ -641,6 +646,7 @@ void LoadLogEnv()
     if (p) {
         box64_cs2c_test = 1;
     }
+#endif
 
 #if !defined(DYNAREC) && (defined(ARM64) || defined(RV64) || defined(LA64))
     printf_log(LOG_INFO, "Warning: DynaRec is available on this host architecture, an interpreter-only build is probably not intended.\n");

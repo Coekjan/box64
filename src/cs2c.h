@@ -9,7 +9,7 @@ void cs2c_sync(
     const char* path,
     size_t guest_addr,
     size_t guest_size,
-    const CodeSignBuf* guest_sign,
+    const CodeSign* guest_sign,
     const void* host_meta,
     size_t host_meta_len,
     const void* host_code,
@@ -18,12 +18,14 @@ int cs2c_lookup(
     const char* path,
     size_t guest_addr,
     size_t guest_size,
-    const CodeSignBuf* guest_sign,
+    const CodeSign* guest_sign,
     const void** host_meta_ptr,
     size_t* host_meta_size,
     const void** host_code_ptr,
     size_t* host_code_size);
-int cs2c_calc_sign(const void* guest_code, size_t guest_size, CodeSignBuf* guest_sign);
+int cs2c_calc_sign(const void* guest_code, size_t guest_size, CodeSign* guest_sign);
+const void* cs2c_block_code(const CacheBlockHeader* block);
+const void* cs2c_block_meta(const CacheBlockHeader* block);
 void cs2c_exit(void);
 
 #endif
