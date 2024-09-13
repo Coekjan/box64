@@ -566,7 +566,7 @@ typedef struct {
         dynarec_log(LOG_NONE,"'" #x "' mismatch: %x vs %x\n", (uintptr_t)origin->x, (uintptr_t)cache->x); \
     }
 
-static void diff_block(uintptr_t addr, int alternate, dynablock_t* origin, size_t origin_sz, dynablock_t *cache, size_t cache_sz) {
+static void diff_block(uintptr_t addr, int alternate, dynablock_t* cache, size_t cache_sz, dynablock_t *origin, size_t origin_sz) {
     int diff = 0;
     
     DIFF(previous)
