@@ -555,6 +555,7 @@ typedef struct {
     size_t real_native_size;
     size_t native_size;
     size_t table64_size;
+    size_t real_insts_size;
     size_t insts_rsize;
     int block_isize;
     uint8_t block_always_test;
@@ -629,39 +630,35 @@ static void diff_block(
     }
 
     // diff instsize
-    for (size_t i = 0; i < origin_meta->insts_rsize && i < cache_meta->insts_rsize; i += sizeof(instsize_t)) {
+    for (size_t i = 0; i < origin_meta->real_insts_size && i < cache_meta->real_insts_size; i += sizeof(instsize_t)) {
         instsize_t *o = (instsize_t*)((uintptr_t)origin->instsize + i);
         instsize_t *c = (instsize_t*)((uintptr_t)cache->instsize + i);
         if (o->x64 != c->x64) {
             diff = 1;
-            dynarec_log(LOG_NONE, "BLOCK INSTSIZE (x64) mismatch at %zu/[%zu, %zu]: %x vs %x\n", i, origin_meta->insts_rsize, cache_meta->insts_rsize, o->x64, c->x64);
+            dynarec_log(LOG_NONE, "BLOCK INSTSIZE (x64) mismatch at %zu/[%zu, %zu]: %x vs %x\n", i, origin_meta->real_insts_size, cache_meta->real_insts_size, o->x64, c->x64);
         }
         if (o->nat != c->nat) {
             diff = 1;
-            dynarec_log(LOG_NONE, "BLOCK INSTSIZE (nat) mismatch at %zu/[%zu, %zu]: %x vs %x\n", i, origin_meta->insts_rsize, cache_meta->insts_rsize, o->nat, c->nat);
+            dynarec_log(LOG_NONE, "BLOCK INSTSIZE (nat) mismatch at %zu/[%zu, %zu]: %x vs %x\n", i, origin_meta->real_insts_size, cache_meta->real_insts_size, o->nat, c->nat);
         }
     }
 
+#if defined(ARM64) && ARM64
+    const size_t empty_size = sizeof(uint32_t) * 2;
+#elif defined(RV64) && RV64
+    const size_t empty_size = sizeof(uint32_t) * 3;
+#elif defined(LA64) && LA64
+    const size_t empty_size = sizeof(uint32_t) * 3;
+#endif
+
     for (
         size_t i = sizeof(void*) + origin_meta->native_size + origin_meta->table64_size;
-        i < origin_sz && i < cache_sz;
+        i < origin_sz - origin_meta->insts_rsize - empty_size - sizeof(void*) &&
+        i < cache_sz - cache_meta->insts_rsize - empty_size - sizeof(void*);
         i += sizeof(uint32_t)
     ) {
         uint32_t o = *(uint32_t*)((uintptr_t)origin->actual_block + i);
         uint32_t c = *(uint32_t*)((uintptr_t)cache->actual_block + i);
-
-        // To skip the unused "empty" part after jmpnext
-        if (i == sizeof(void*) + origin_meta->native_size + origin_meta->table64_size * sizeof(uint64_t) + sizeof(void*)
-#if defined(ARM64) && ARM64
-            + sizeof(uint32_t) * 2
-#elif defined(RV64) && RV64
-            + sizeof(uint32_t) * 3
-#elif defined(LA64) && LA64
-            + sizeof(uint32_t) * 3
-#endif
-        ) {
-            continue;
-        }
 
         if (o != c) {
             diff = 1;
@@ -851,9 +848,9 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
 
         const cs2c_meta_t* host_meta;
         size_t host_meta_size;
-        const void* host_blk;
-        size_t host_sz;
-        ret = cs2c_lookup(elf_path, end - addr, &code_sign, (const void **)&host_meta, &host_meta_size, &host_blk, &host_sz);
+        const void* host_code;
+        size_t host_code_size;
+        ret = cs2c_lookup(elf_path, end - addr, &code_sign, (const void **)&host_meta, &host_meta_size, &host_code, &host_code_size);
         switch (ret) {
             case 0:
                 // Cache Hit
@@ -868,6 +865,7 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
                 goto slow_path;
         }
         assert(host_meta_size == sizeof(cs2c_meta_t));
+        assert(host_code_size == host_meta->native_size);
 
         dynarec_native_t helper_bkp;
         dynablock_t block_bkp;
@@ -884,12 +882,11 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         }
 
         size_t sz = sizeof(void*) + host_meta->native_size + host_meta->table64_size * sizeof(uint64_t) + 4 * sizeof(void*) + host_meta->insts_rsize;
-        assert(sz == host_sz + sizeof(void*));
         void *actual_p = (void *)AllocDynarecMap(sz);
         block->block = actual_p + sizeof(void*);
         *(dynablock_t **)actual_p = block;
 
-        memcpy(block->block, host_blk, host_sz);
+        memcpy(block->block, host_code, host_code_size);
 
         block->actual_block = actual_p;
         void *tablestart = block->block + host_meta->native_size;
@@ -957,6 +954,7 @@ slow_path:
 #ifdef CS2
     if (cs2c_with_fast_path) {
         host_metadata.real_native_size = helper.native_size;
+        host_metadata.real_insts_size = helper.insts_size;
         host_metadata.table64_size = helper.table64size;
     }
 #endif
@@ -1088,7 +1086,7 @@ slow_path:
             // FIXME: FREE block hit?
         }
         if (!cs2c_cache_hit) {
-            cs2c_sync(elf_path, end - addr, &code_sign, &host_metadata, sizeof(host_metadata), p, sz - sizeof(void*));
+            cs2c_sync(elf_path, end - addr, &code_sign, &host_metadata, sizeof(host_metadata), p, host_metadata.native_size);
         }
     }
 #endif
