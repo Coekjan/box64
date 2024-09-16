@@ -65,7 +65,7 @@ int cs2c_lookup(
     if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_size, guest_sign, host_meta_ptr, host_meta_size, host_code_ptr, host_code_size)) == -EINVAL) {
         printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
     }
-    if (ret == -0x80000000) {
+    if ((ret & 0xf0000000) == 0x80000000) {
         cs2c_path_attach((const char*[]) { path }, 1);
         if ((ret = cs2s_ro_lookup(cs2s_ro, path, guest_size, guest_sign, host_meta_ptr, host_meta_size, host_code_ptr, host_code_size)) == -EINVAL) {
             printf_log(LOG_NONE, "Failed to lookup address in lookup router: %d\n", ret);
