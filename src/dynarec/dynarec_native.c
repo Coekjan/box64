@@ -851,7 +851,7 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         size_t host_meta_size;
         const void* host_code;
         size_t host_code_size;
-        ret = cs2c_lookup(elf_path, end - addr, &code_sign, (const void **)&host_meta, &host_meta_size, &host_code, &host_code_size);
+        ret = cs2c_lookup(elf_path, addr, end - addr, &code_sign, (const void **)&host_meta, &host_meta_size, &host_code, &host_code_size);
         switch (ret) {
             case 0:
                 // Cache Hit
@@ -1087,7 +1087,7 @@ slow_path:
             // FIXME: FREE block hit?
         }
         if (!cs2c_cache_hit) {
-            cs2c_sync(elf_path, end - addr, &code_sign, &host_metadata, sizeof(host_metadata), p, host_metadata.native_size);
+            cs2c_sync(elf_path, addr, end - addr, &code_sign, &host_metadata, sizeof(host_metadata), p, host_metadata.native_size);
         }
     }
 #endif

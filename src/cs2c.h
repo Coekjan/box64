@@ -7,6 +7,7 @@ void cs2c_init(void);
 void cs2c_path_attach(const char* const* paths, size_t paths_len);
 void cs2c_sync(
     const char* path,
+    size_t guest_addr,
     size_t guest_size,
     const CodeSign* guest_sign,
     const void* host_meta,
@@ -15,6 +16,7 @@ void cs2c_sync(
     size_t host_code_len);
 int cs2c_lookup(
     const char* path,
+    size_t guest_addr,
     size_t guest_size,
     const CodeSign* guest_sign,
     const void** host_meta_ptr,
