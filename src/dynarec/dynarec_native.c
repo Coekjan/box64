@@ -575,6 +575,7 @@ typedef struct {
     }
 
 static void diff_block(
+    const char *path,
     uintptr_t addr,
     int alternate,
     dynablock_t* cache,
@@ -667,7 +668,7 @@ static void diff_block(
     }
 
     if (diff) {
-        dynarec_log(LOG_NONE, "%p (alt=%s): BLOCK ERROR???? PLEASE CHECK!!!!\n", (void *)addr, alternate ? "true" : "false");
+        dynarec_log(LOG_NONE, "%s/%p (alt=%s): BLOCK ERROR???? PLEASE CHECK!!!!\n", path, (void *)addr, alternate ? "true" : "false");
     }
 }
 
@@ -1082,7 +1083,7 @@ slow_path:
         host_metadata.block_always_test = block->always_test;
         host_metadata.block_dirty = block->dirty;
         if (box64_cs2c_test && cs2c_cache_hit) {
-            diff_block(addr, alternate, &block_hit, block_hit_sz, &meta_hit, block, sz, &host_metadata);
+            diff_block(elf_path, addr, alternate, &block_hit, block_hit_sz, &meta_hit, block, sz, &host_metadata);
             // FIXME: FREE block hit?
         }
         if (!cs2c_cache_hit) {
