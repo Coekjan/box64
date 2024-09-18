@@ -1449,7 +1449,7 @@ void my_box64signalhandler(int32_t sig, siginfo_t* info, void * ucntx)
     }
 #ifdef CS2
     if((Locks & is_dyndump_locked) && ((sig==SIGSEGV) || (sig==SIGBUS)) && cs2c_preloading) {
-        printf_log(LOG_INFO, "FillBlock triggered a %s at %p from %p\n", (sig==SIGSEGV)?"segfault":"bus error", addr, pc);
+        printf_log(LOG_INFO, "PreloadBlock triggered a %s at %p from %p\n", (sig==SIGSEGV)?"segfault":"bus error", addr, pc);
         CancelBlock64(0);
         relockMutex(Locks);
         cancelFillBlock();  // Segfault inside a Fillblock, cancel it's creation...
