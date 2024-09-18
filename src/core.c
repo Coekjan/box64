@@ -51,6 +51,7 @@ int box64_log = LOG_INFO; //LOG_NONE;
 
 #ifdef CS2
 int box64_cs2c = 1;
+int box64_cs2c_preload = 1;
 int box64_cs2c_mark = 1024;
 int box64_cs2c_test = 0;
 #endif
@@ -632,6 +633,14 @@ void LoadLogEnv()
         }
         if(box64_cs2c)
             printf_log(LOG_INFO, "CS2C mode is ON\n");
+    }
+
+    p = getenv("BOX64_CS2C_PRELOAD");
+    if (p) {
+        if (strlen(p) == 1) {
+            if (p[0] >= '0' && p[0] <= '1')
+                box64_cs2c_preload = p[0] - '0';
+        }
     }
 
     p = getenv("BOX64_CS2C_MARK");

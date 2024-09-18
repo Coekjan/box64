@@ -225,7 +225,7 @@ begin:
     }
 
 #ifdef CS2
-    if (elf_test_and_set_preloaded_from_addr(addr) == 0) {
+    if (box64_cs2c && box64_cs2c_preload && elf_test_and_set_preloaded_from_addr(addr) == 0) {
         // For each cached guest code block:
         // 1. Check if the block is already in DB. If it is, skip it.
         // 2. Check if it is identical to the block at the same address. If it is not, skip it.

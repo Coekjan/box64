@@ -102,7 +102,7 @@ int cs2c_for_each_blocks(const char* path, void* data, void (*callback)(void*, c
     if ((ret = cs2s_ro_for_each_blocks(cs2s_ro, path, data, callback)) == -EINVAL) {
         printf_log(LOG_NONE, "Failed to iterate blocks in lookup router: %d\n", ret);
     }
-    if (ret == -0x80000000) {
+    if ((ret & 0xf0000000) == 0x80000000) {
         cs2c_path_attach((const char*[]) { path }, 1);
         if ((ret = cs2s_ro_for_each_blocks(cs2s_ro, path, data, callback)) == -EINVAL) {
             printf_log(LOG_NONE, "Failed to iterate blocks in lookup router: %d\n", ret);
