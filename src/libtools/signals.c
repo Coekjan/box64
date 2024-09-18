@@ -1344,6 +1344,11 @@ void my_sigactionhandler_oldcode(int32_t sig, int simple, siginfo_t* info, void 
 }
 
 extern void* current_helper;
+
+#ifdef CS2
+extern int cs2c_preloading;
+#endif
+
 #define USE_SIGNAL_MUTEX
 #ifdef USE_SIGNAL_MUTEX
 #ifdef USE_CUSTOM_MUTEX
@@ -1442,6 +1447,15 @@ void my_box64signalhandler(int32_t sig, siginfo_t* info, void * ucntx)
         cancelFillBlock();  // Segfault inside a Fillblock, cancel it's creation...
         // cancelFillBlock does not return
     }
+#ifdef CS2
+    if((Locks & is_dyndump_locked) && ((sig==SIGSEGV) || (sig==SIGBUS)) && cs2c_preloading) {
+        printf_log(LOG_INFO, "FillBlock triggered a %s at %p from %p\n", (sig==SIGSEGV)?"segfault":"bus error", addr, pc);
+        CancelBlock64(0);
+        relockMutex(Locks);
+        cancelFillBlock();  // Segfault inside a Fillblock, cancel it's creation...
+        // cancelFillBlock does not return
+    }
+#endif
     dynablock_t* db = NULL;
     int db_searched = 0;
     if ((sig==SIGSEGV) && (addr) && (info->si_code == SEGV_ACCERR) && (prot&PROT_DYNAREC)) {

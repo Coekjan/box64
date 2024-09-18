@@ -1108,6 +1108,8 @@ slow_path:
 #include "dynablock.h"
 #include "rbtree.h"
 
+int cs2c_preloading = 0;
+
 void* PreloadFillBlock64(
     dynablock_t* block,
     uintptr_t addr,
@@ -1120,6 +1122,8 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
     int err;
     dynablock_t* block;
     cs2c_preload_ctx* ctx = (cs2c_preload_ctx*)data;
+
+    cs2c_preloading = 1;
 
     // Step 1: Check if the block is already in DB. If it is, skip it.
     void* start = (void*)cs2_block->guest_addr;
@@ -1189,6 +1193,8 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
         }
         ctx->count++;
     }
+
+    cs2c_preloading = 0;
 }
 
 // Similar to FillBlock64, but the cached block is provided
