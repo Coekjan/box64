@@ -1111,6 +1111,7 @@ slow_path:
 int cs2c_preloading = 0;
 
 void* PreloadFillBlock64(
+    cs2c_preload_ctx* ctx,
     dynablock_t* block,
     uintptr_t addr,
     int alternate,
@@ -1161,7 +1162,7 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
     }
     cs2c_meta_t* meta = (cs2c_meta_t*)cs2c_block_meta(cs2_block);
     assert(cs2_block->host_meta_size == sizeof(cs2c_meta_t));
-    void* ret = PreloadFillBlock64(block, (uintptr_t)start, meta->alternate, ctx->is32bits, cs2_block);
+    void* ret = PreloadFillBlock64(ctx, block, (uintptr_t)start, meta->alternate, ctx->is32bits, cs2_block);
     if (!ret) {
         dynarec_log(LOG_DEBUG, "PreloadFillblock64 of block %p for %p returned an error\n", block, start);
         customFree(block);
@@ -1199,6 +1200,7 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
 
 // Similar to FillBlock64, but the cached block is provided
 void* PreloadFillBlock64(
+    cs2c_preload_ctx* ctx,
     dynablock_t* block,
     uintptr_t addr,
     int alternate,
@@ -1342,6 +1344,7 @@ void* PreloadFillBlock64(
         return NULL;
     }
 
+#if 0
     // pass 2, instruction size
     native_pass2(&helper, addr, alternate, is32bits);
     if(helper.abort) {
@@ -1465,7 +1468,7 @@ void* PreloadFillBlock64(
     return (void*)block;
 
     // BUG HERE: ...The following code contains (some) potential bugs...
-#if 0
+#else
 
     // fetch the host code and meta, and fill the block
     const cs2c_meta_t* host_meta = (const cs2c_meta_t*)cs2c_block_meta(cs2_block);
@@ -1479,16 +1482,9 @@ void* PreloadFillBlock64(
         return NULL;
     }
 
-    if (native_size != host_meta->native_size) {
-        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Block native size mismatch: %p\n", (void*)addr);
-        CancelBlock64(0);
-        return NULL;
-    }
-
-    assert(start == cs2_block->guest_addr);
+    assert(start == cs2_block->guest_addr + ctx->delta);
     assert(host_meta_size == sizeof(cs2c_meta_t));
     assert(host_code_size == host_meta->native_size);
-    assert(insts_rsize == host_meta->insts_rsize);
 
     size_t sz = sizeof(void*) + host_meta->native_size + host_meta->table64_size * sizeof(uint64_t) + 4 * sizeof(void*) + host_meta->insts_rsize;
     void *actual_p = (void *)AllocDynarecMap(sz);
