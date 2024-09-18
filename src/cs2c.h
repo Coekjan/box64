@@ -37,6 +37,7 @@ typedef struct cs2c_preload_ctx {
     const char *elf_path;
     const int is32bits;
     const int need_lock;
+    const uintptr_t delta;
     int count;
     void *start;
     void *end;

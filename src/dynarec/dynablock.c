@@ -234,7 +234,8 @@ begin:
         // 
         // After all cached blocks are processed, flush icache for the range of start/end address.
 
-        const char* elf_path = elf_path_from_addr(addr);
+        uintptr_t elf_delta;
+        const char* elf_path = elf_info_from_addr(addr, &elf_delta);
         assert(elf_path != NULL);
 
         // Preload: Step 1, 2, 3.
@@ -242,6 +243,7 @@ begin:
             .elf_path = elf_path,
             .is32bits = is32bits,
             .need_lock = need_lock,
+            .delta = elf_delta,
             .count = 0,
             .start = NULL,
             .end = NULL,

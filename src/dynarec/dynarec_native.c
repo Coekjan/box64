@@ -1126,7 +1126,7 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
     cs2c_preloading = 1;
 
     // Step 1: Check if the block is already in DB. If it is, skip it.
-    void* start = (void*)cs2_block->guest_addr;
+    void* start = (void*)cs2_block->guest_addr + ctx->delta;
     void* end = (void*)((uintptr_t)start + cs2_block->guest_size);
 
     if (hasAlternate((void*)start) || getDB((uintptr_t)start)) {
