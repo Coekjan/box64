@@ -1897,13 +1897,16 @@ EXPORT void PltResolver64(x64emu_t* emu)
     R_RIP = offs;
 }
 
-const char *elf_path_from_addr(uintptr_t addr) {
+const char *elf_info_from_addr(uintptr_t addr, uintptr_t *delta) {
     for (size_t i = 0; i < my_context->elfsize; i++) {
         elfheader_t *elf = my_context->elfs[i];
         if (!elf) {
             continue;
         }
         if (addr >= elf->delta && addr < elf->delta + elf->memsz) {
+            if (delta) {
+                *delta = elf->delta;
+            }
             return elf->path;
         }
     }
