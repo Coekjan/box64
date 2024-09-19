@@ -921,7 +921,12 @@ void* FillBlock64(
 
         size_t rounded_native_size = (helper.native_size + 7) & ~7;
         if (rounded_native_size != host_meta->native_size) {
-            dynarec_log(LOG_NONE, "CACHE ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+            dynarec_log(LOG_DEBUG, "CACHE ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+            CancelBlock64(0);
+            return (void*)(-1);
+        }
+        if (helper.table64size != helper.table64cap) {
+            dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Table64 size mismatch: %p (%d vs %d)\n", (void*)addr, helper.table64size, helper.table64cap);
             CancelBlock64(0);
             return (void*)(-1);
         }
@@ -1536,6 +1541,11 @@ void* PreloadFillBlock64(
     size_t rounded_native_size = (helper.native_size + 7) & ~7;
     if (rounded_native_size != host_meta->native_size) {
         dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+        CancelBlock64(0);
+        return NULL;
+    }
+    if (helper.table64size != helper.table64cap) {
+        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Table64 size mismatch: %p (%d vs %d)\n", (void*)addr, helper.table64size, helper.table64cap);
         CancelBlock64(0);
         return NULL;
     }
