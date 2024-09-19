@@ -277,12 +277,25 @@ begin:
             mutex_unlock(&my_context->mutex_dyndump);
         return NULL;
     }
+#ifdef CS2
+    int use_cache = 1;
+fill_block_retry:
+    void* ret = FillBlock64(block, filladdr, (addr==filladdr)?0:1, is32bits, use_cache);
+#else
     void* ret = FillBlock64(block, filladdr, (addr==filladdr)?0:1, is32bits);
+#endif
     if(!ret) {
         dynarec_log(LOG_DEBUG, "Fillblock of block %p for %p returned an error\n", block, (void*)addr);
         customFree(block);
         block = NULL;
     }
+#ifdef CS2
+    else if (ret == (void*)(-1)) {
+        dynarec_log(LOG_DEBUG, "Fillblock of block %p for %p return code indicating a need to retry without cache\n", block, (void*)addr);
+        use_cache = 0;
+        goto fill_block_retry;
+    }
+#endif
     // check size
     if(block) {
         // fill-in jumptable

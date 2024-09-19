@@ -678,7 +678,15 @@ static void diff_block(
 
 #endif
 
-void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bits) {
+void* FillBlock64(
+    dynablock_t* block,
+    uintptr_t addr,
+    int alternate,
+    int is32bits
+#ifdef CS2
+    , int use_cache
+#endif
+) {
     /*
         A Block must have this layout:
 
@@ -830,6 +838,9 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
     }
 
 #ifdef CS2
+    if (!use_cache) {
+        goto slow_path;
+    }
     int cs2c_cache_hit = 0;
     dynablock_t block_hit;
     size_t block_hit_sz;
@@ -907,6 +918,14 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
         helper.insts_size = 0;  // reset
 
         native_pass4(&helper, addr, alternate, is32bits);
+
+        size_t rounded_native_size = (helper.native_size + 7) & ~7;
+        if (rounded_native_size != host_meta->native_size) {
+            dynarec_log(LOG_NONE, "CACHE ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+            CancelBlock64(0);
+            return (void*)(-1);
+        }
+
         block->size = sz;
         block->x64_addr = (void*)addr;
         block->x64_size = end - addr;
@@ -1186,11 +1205,11 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
             }
         }
         // Finally, adjust start/end address in context
-        if (!ctx->start || ctx->start > start) {
-            ctx->start = start;
+        if (!ctx->start || ctx->start > block->block) {
+            ctx->start = block->block;
         }
-        if (!ctx->end || ctx->end < end) {
-            ctx->end = end;
+        if (!ctx->end || ctx->end < block->block + block->size) {
+            ctx->end = block->block + block->size;
         }
         ctx->count++;
     }
@@ -1488,6 +1507,11 @@ void* PreloadFillBlock64(
 
     size_t sz = sizeof(void*) + host_meta->native_size + host_meta->table64_size * sizeof(uint64_t) + 4 * sizeof(void*) + host_meta->insts_rsize;
     void *actual_p = (void *)AllocDynarecMap(sz);
+    if (actual_p == NULL) {
+        dynarec_log(LOG_INFO, "AllocDynarecMap(%p, %zu) failed, canceling block\n", block, sz);
+        CancelBlock64(0);
+        return NULL;
+    }
     block->block = actual_p + sizeof(void*);
     *(dynablock_t **)actual_p = block;
 
@@ -1508,6 +1532,14 @@ void* PreloadFillBlock64(
     helper.insts_size = 0;  // reset
 
     native_pass4(&helper, addr, alternate, is32bits);
+
+    size_t rounded_native_size = (helper.native_size + 7) & ~7;
+    if (rounded_native_size != host_meta->native_size) {
+        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+        CancelBlock64(0);
+        return NULL;
+    }
+
     block->size = sz;
     block->x64_addr = (void*)addr;
     block->x64_size = end - addr;

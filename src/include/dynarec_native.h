@@ -24,7 +24,11 @@ typedef struct instsize_s instsize_t;
 void addInst(instsize_t* insts, size_t* size, int x64_size, int native_size);
 
 void CancelBlock64(int need_lock);
-void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bits);
+void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bits
+#ifdef CS2
+, int use_cache
+#endif
+);
 
 #ifdef CS2
 #include <cs2c.h>

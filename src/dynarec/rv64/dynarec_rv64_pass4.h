@@ -3,7 +3,7 @@
     if(ninst)       \
         addInst(dyn->instsize, &dyn->insts_size, dyn->insts[ninst].x64.size, dyn->insts[ninst].size/4); \
     addInst(dyn->instsize, &dyn->insts_size, 0, 0);
-#define EMIT(A) do { dyn->insts[ninst].size += 4; } while (0)
+#define EMIT(A) do { dyn->insts[ninst].size += 4; dyn->native_size += 4; } while (0)
 
 #define MESSAGE(A, ...)
 #define NEW_INST                                                                                                 \
