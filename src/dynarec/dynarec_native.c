@@ -299,7 +299,7 @@ int Table64(dynarec_native_t *dyn, uint64_t val, int pass)
         idx = dyn->table64size++;
         if(idx < dyn->table64cap)
             dyn->table64[idx] = val;
-        else if(pass==3 || pass==4)
+        else if(pass==3)
             printf_log(LOG_NONE, "Warning, table64 bigger than expected %d vs %d\n", idx, dyn->table64cap);
     }
     // calculate offset
@@ -1150,9 +1150,13 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
 
     cs2c_preloading = 1;
 
-    // Step 1: Check if the block is already in DB. If it is, skip it.
+    // Step 1: Check if the block is already in DB or should be ignored. If it is, skip it.
     void* start = (void*)cs2_block->guest_addr + ctx->delta;
     void* end = (void*)((uintptr_t)start + cs2_block->guest_size);
+
+    if ((uintptr_t)start >= box64_nodynarec_start && (uintptr_t)start < box64_nodynarec_end) {
+        return;
+    }
 
     if (hasAlternate((void*)start) || getDB((uintptr_t)start)) {
         return;
