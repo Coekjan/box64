@@ -34,7 +34,7 @@ void* FillBlock64(dynablock_t* block, uintptr_t addr, int alternate, int is32bit
 #include <cs2c.h>
 
 void CancelPreloadBlock64();
-void PreloadBlock64(void* data, const CacheBlockHeader* block);
+void PreloadBlock64(void* data, const CacheTableDataRaw* block);
 #endif
 
 #endif //__DYNAREC_ARM_H_

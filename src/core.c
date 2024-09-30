@@ -52,7 +52,7 @@ int box64_log = LOG_INFO; //LOG_NONE;
 #ifdef CS2
 int box64_cs2c = 1;
 int box64_cs2c_preload = 1;
-int box64_cs2c_mark = 1024;
+int box64_cs2c_mark = 0;
 int box64_cs2c_test = 0;
 #endif
 

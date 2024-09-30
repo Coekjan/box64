@@ -86,17 +86,7 @@ int cs2c_test_sign(const CodeSign* sign1, const CodeSign* sign2)
     return cs2s_helper_test_sign(sign1, sign2);
 }
 
-const void* cs2c_block_code(const CacheBlockHeader* block)
-{
-    return cs2s_helper_block_code(block);
-}
-
-const void* cs2c_block_meta(const CacheBlockHeader* block)
-{
-    return cs2s_helper_block_meta(block);
-}
-
-int cs2c_for_each_blocks(const char* path, void* data, void (*callback)(void*, const CacheBlockHeader*))
+int cs2c_for_each_blocks(const char* path, void* data, void (*callback)(void*, const CacheTableDataRaw*))
 {
     int ret;
     if ((ret = cs2s_ro_for_each_blocks(cs2s_ro, path, data, callback)) == -EINVAL) {

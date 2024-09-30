@@ -1140,9 +1140,9 @@ void* PreloadFillBlock64(
     uintptr_t addr,
     int alternate,
     int is32bits,
-    const CacheBlockHeader* cs2_block);
+    const CacheTableDataRaw* cs2_block);
 
-void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
+void PreloadBlock64(void* data, const CacheTableDataRaw* cs2_block)
 {
     int err;
     dynablock_t* block;
@@ -1173,7 +1173,7 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
         dynarec_log(LOG_NONE, "CS2 Failed to calculate sign: %d\n", err);
         return;
     }
-    if (!cs2c_test_sign(&code_sign, &cs2_block->guest_sign)) {
+    if (!cs2c_test_sign(&code_sign, cs2_block->guest_sign)) {
         dynarec_log(LOG_DEBUG, "CS2 Code sign mismatch\n");
         return;
     }
@@ -1188,8 +1188,8 @@ void PreloadBlock64(void* data, const CacheBlockHeader* cs2_block)
         FreeDynablock(block, 0);
         return;
     }
-    cs2c_meta_t* meta = (cs2c_meta_t*)cs2c_block_meta(cs2_block);
-    assert(cs2_block->host_meta_size == sizeof(cs2c_meta_t));
+    cs2c_meta_t* meta = (cs2c_meta_t*)cs2_block->host_meta;
+    assert(cs2_block->host_meta_len == sizeof(cs2c_meta_t));
     void* ret = PreloadFillBlock64(ctx, block, (uintptr_t)start, meta->alternate, ctx->is32bits, cs2_block);
     if (!ret) {
         dynarec_log(LOG_DEBUG, "PreloadFillblock64 of block %p for %p returned an error\n", block, start);
@@ -1233,7 +1233,7 @@ void* PreloadFillBlock64(
     uintptr_t addr,
     int alternate,
     int is32bits,
-    const CacheBlockHeader* cs2_block)
+    const CacheTableDataRaw* cs2_block)
 {
     if(addr>=box64_nodynarec_start && addr<box64_nodynarec_end) {
         dynarec_log(LOG_INFO, "Create empty block in no-dynarec zone\n");
@@ -1373,10 +1373,10 @@ void* PreloadFillBlock64(
     }
 
     // fetch the host code and meta, and fill the block
-    const cs2c_meta_t* host_meta = (const cs2c_meta_t*)cs2c_block_meta(cs2_block);
-    size_t host_meta_size = cs2_block->host_meta_size;
-    const void* host_code = cs2c_block_code(cs2_block);
-    size_t host_code_size = cs2_block->host_code_size;
+    const cs2c_meta_t* host_meta = (const cs2c_meta_t*)cs2_block->host_meta;
+    size_t host_meta_size = cs2_block->host_meta_len;
+    const void* host_code = cs2_block->host_code;
+    size_t host_code_size = cs2_block->host_code_len;
 
     if (end - start != cs2_block->guest_size) {
         dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Block size mismatch: %p\n", (void*)addr);
