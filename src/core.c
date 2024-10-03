@@ -1749,7 +1749,9 @@ void endBox64()
     }
 
 #ifdef CS2
-    cs2c_exit();
+    if (box64_cs2c) {
+        cs2c_exit();
+    }
 #endif
 }
 
@@ -2412,8 +2414,10 @@ int initialize(int argc, const char **argv, char** env, x64emu_t** emulator, elf
     AddMainElfToLinkmap(elf_header);
 
 #ifdef CS2
-    cs2c_init();
-    cs2c_path_attach((const char *[]) { my_context->fullpath }, 1);
+    if (box64_cs2c) {
+        cs2c_init();
+        cs2c_path_attach((const char *[]) { my_context->fullpath }, 1);
+    }
 #endif
 
     // pre-load lib if needed

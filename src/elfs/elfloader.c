@@ -1897,6 +1897,7 @@ EXPORT void PltResolver64(x64emu_t* emu)
     R_RIP = offs;
 }
 
+#ifdef CS2
 const char *elf_info_from_addr(uintptr_t addr, uintptr_t *delta) {
     for (size_t i = 0; i < my_context->elfsize; i++) {
         elfheader_t *elf = my_context->elfs[i];
@@ -1933,3 +1934,4 @@ int elf_test_and_set_preloaded_from_addr(uintptr_t addr) {
     // `-1` means the elf is not found
     return -1;
 }
+#endif

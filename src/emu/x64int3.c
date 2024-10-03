@@ -71,7 +71,9 @@ x64emu_t* x64emu_fork(x64emu_t* emu, int forktype)
         }
     } else if(v==0) {
 #ifdef CS2
-        cs2c_init();
+        if (box64_cs2c) {
+            cs2c_init();
+        }
 #endif
         ResetSegmentsCache(emu);
         // execute atforks child functions
