@@ -8,6 +8,7 @@ extern int box64_cs2c;
 extern int box64_cs2c_preload;
 extern int box64_cs2c_mark;
 extern int box64_cs2c_test;
+extern int box64_cs2c_bench;
 extern int box64_dump;   // dump elf or not
 extern int box64_dynarec_log;
 extern int box64_dynarec;

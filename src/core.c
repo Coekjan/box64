@@ -54,6 +54,7 @@ int box64_cs2c = 1;
 int box64_cs2c_preload = 1;
 int box64_cs2c_mark = 0;
 int box64_cs2c_test = 0;
+int box64_cs2c_bench = 0;
 #endif
 
 int box64_dump = 0;
@@ -654,6 +655,11 @@ void LoadLogEnv()
     p = getenv("BOX64_CS2C_TEST");
     if (p) {
         box64_cs2c_test = 1;
+    }
+
+    p = getenv("BOX64_CS2C_BENCH");
+    if (p) {
+        box64_cs2c_bench = 1;
     }
 #endif
 

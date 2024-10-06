@@ -24,6 +24,7 @@
 #include "dynarec_next.h"
 
 #ifdef CS2
+#include <sys/time.h>
 #include "cs2c.h"
 #endif
 
@@ -676,6 +677,28 @@ static void diff_block(
 #undef DIFF_META
 #undef DIFF
 
+#define BENCH_PASS0 0
+#define BENCH_PASS1 1
+#define BENCH_PASS2 2
+#define BENCH_PASS3 3
+#define BENCH_PASS4 4
+#define BENCH_CS2C 5
+#define BENCH_CACHE_FLUSH 6
+
+void bench_output(int id, const struct timeval *st, const struct timeval *ed) {
+    static FILE *output[7] = {NULL};
+    if (!output[id]) {
+        char name[256] = {0};
+        sprintf(name, "bench_%d.txt", id);
+        output[id] = fopen(name, "w");
+    }
+    
+    struct timeval diff;
+    timersub(ed, st, &diff);
+
+    fprintf(output[id], "%ld.%06ld\n", diff.tv_sec, diff.tv_usec);
+}
+
 #endif
 
 void* FillBlock64(
@@ -700,6 +723,9 @@ void* FillBlock64(
         B+32 .. B+32+sz : instsize (compressed array with each instruction length on x64 and native side)
 
     */
+#ifdef CS2
+    struct timeval st, ed;
+#endif
     if(addr>=box64_nodynarec_start && addr<box64_nodynarec_end) {
         dynarec_log(LOG_INFO, "Create empty block in no-dynarec zone\n");
         return CreateEmptyBlock(block, addr);
@@ -708,6 +734,12 @@ void* FillBlock64(
         dynarec_log(LOG_DEBUG, "Canceling dynarec FillBlock at %p as another one is going on\n", (void*)addr);
         return NULL;
     }
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench pass 0 begin
+        gettimeofday(&st, NULL);
+    }
+#endif
     // protect the 1st page
     protectDB(addr, 1);
     // init the helper
@@ -828,7 +860,16 @@ void* FillBlock64(
         return CreateEmptyBlock(block, addr);
     }
     updateYmm0s(&helper, 0, 0);
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench pass 0 end
+        gettimeofday(&ed, NULL);
+        bench_output(BENCH_PASS0, &st, &ed);
 
+        // Bench pass 1 begin
+        gettimeofday(&st, NULL);
+    }
+#endif
     // pass 1, float optimizations, first pass for flags
     native_pass1(&helper, addr, alternate, is32bits);
     if(helper.abort) {
@@ -836,6 +877,14 @@ void* FillBlock64(
         CancelBlock64(0);
         return NULL;
     }
+
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench pass 1 end
+        gettimeofday(&ed, NULL);
+        bench_output(BENCH_PASS1, &st, &ed);
+    }
+#endif
 
 #ifdef CS2
     if (!use_cache) {
@@ -854,6 +903,11 @@ void* FillBlock64(
     cs2c_with_fast_path = elf_path != NULL;
     CodeSign code_sign;
     if (cs2c_with_fast_path) {
+        if (box64_cs2c_bench) {
+            // Bench CS2C begin
+            gettimeofday(&st, NULL);
+        }
+
         int ret;
         if ((ret = cs2c_calc_sign((void*)addr, end - addr, &code_sign)) < 0) {
             dynarec_log(LOG_NONE, "CS2 Failed to calculate sign: %d\n", ret);
@@ -865,6 +919,12 @@ void* FillBlock64(
         const void* host_code;
         size_t host_code_size;
         ret = cs2c_lookup(elf_path, addr - elf_delta, end - addr, &code_sign, (const void **)&host_meta, &host_meta_size, &host_code, &host_code_size);
+        if (box64_cs2c_bench) {
+            // Bench CS2C end
+            gettimeofday(&ed, NULL);
+            bench_output(BENCH_CS2C, &st, &ed);
+        }
+
         switch (ret) {
             case 0:
                 // Cache Hit
@@ -893,6 +953,11 @@ void* FillBlock64(
             memcpy(static_next_bkp, static_next, sizeof(static_next));
             memcpy(static_table64_bkp, static_table64, sizeof(static_table64));
             memcpy(static_insts_bkp, static_insts, sizeof(static_insts));
+        }
+
+        if (box64_cs2c_bench) {
+            // Bench pass 4 begin
+            gettimeofday(&st, NULL);
         }
 
         size_t sz = sizeof(void*) + host_meta->native_size + host_meta->table64_size * sizeof(uint64_t) + 4 * sizeof(void*) + host_meta->insts_rsize;
@@ -945,6 +1010,12 @@ void* FillBlock64(
         *(void**)(next + 3 * sizeof(void*)) = native_next;
         CreateJmpNext(block->jmpnext, next + 3 * sizeof(void*));
 
+        if (box64_cs2c_bench) {
+            // Bench pass 4 end
+            gettimeofday(&ed, NULL);
+            bench_output(BENCH_PASS4, &st, &ed);
+        }
+
         cs2c_cache_hit = 1;
         if (box64_cs2c_test) {
             block_hit = *block;
@@ -962,7 +1033,16 @@ void* FillBlock64(
             goto slow_path;
         }
 
+        if (box64_cs2c_bench) {
+            // Bench cache flush begin
+            gettimeofday(&st, NULL);
+        }
         __clear_cache(actual_p, actual_p + sz);
+        if (box64_cs2c_bench) {
+            // Bench cache flush end
+            gettimeofday(&ed, NULL);
+            bench_output(BENCH_CACHE_FLUSH, &st, &ed);
+        }
         current_helper = NULL;
         dynarec_log(LOG_DEBUG, "CS2 Done, block %p\n", (void*)block->block);
         return (void*)block->block;
@@ -971,6 +1051,13 @@ slow_path:
 
     cs2c_meta_t host_metadata;
 #endif
+
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench pass 2 begin
+        gettimeofday(&st, NULL);
+    }
+#endif
     // pass 2, instruction size
     native_pass2(&helper, addr, alternate, is32bits);
     if(helper.abort) {
@@ -978,6 +1065,18 @@ slow_path:
         CancelBlock64(0);
         return NULL;
     }
+
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench pass 2 end
+        gettimeofday(&ed, NULL);
+        bench_output(BENCH_PASS2, &st, &ed);
+
+        // Bench pass 3 begin
+        gettimeofday(&st, NULL);
+    }
+#endif
+
 #ifdef CS2
     if (cs2c_with_fast_path) {
         host_metadata.real_native_size = helper.native_size;
@@ -1059,10 +1158,32 @@ slow_path:
     *(dynablock_t**)next = block;
     *(void**)(next+3*sizeof(void*)) = native_next;
     CreateJmpNext(block->jmpnext, next+3*sizeof(void*));
+
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench pass 3 end
+        gettimeofday(&ed, NULL);
+        bench_output(BENCH_PASS3, &st, &ed);
+    }
+#endif
+
     //block->x64_addr = (void*)start;
     block->x64_size = end-start;
     // all done...
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench cache flush begin
+        gettimeofday(&st, NULL);
+    }
+#endif
     __clear_cache(actual_p, actual_p+sz);   // need to clear the cache before execution...
+#ifdef CS2
+    if (box64_cs2c_bench) {
+        // Bench cache flush end
+        gettimeofday(&ed, NULL);
+        bench_output(BENCH_CACHE_FLUSH, &st, &ed);
+    }
+#endif
     block->hash = X31_hash_code(block->x64_addr, block->x64_size);
     // Check if something changed, to abort if it is
     if((helper.abort || (block->hash != hash))) {
