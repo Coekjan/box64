@@ -1078,7 +1078,7 @@ slow_path:
     if (box64_cs2c_bench) {
         // Bench pass 2 end
         gettimeofday(&ed, NULL);
-        if (cs2c_with_fast_path) {
+        if (cs2c_with_fast_path || !box64_cs2c) {
             bench_output(BENCH_PASS2, &st, &ed);
         }
 
@@ -1173,7 +1173,7 @@ slow_path:
     if (box64_cs2c_bench) {
         // Bench pass 3 end
         gettimeofday(&ed, NULL);
-        if (cs2c_with_fast_path) {
+        if (cs2c_with_fast_path || !box64_cs2c) {
             bench_output(BENCH_PASS3, &st, &ed);
         }
     }
