@@ -697,6 +697,7 @@ void bench_output(int id, const struct timeval *st, const struct timeval *ed) {
     timersub(ed, st, &diff);
 
     fprintf(output[id], "%ld.%06ld\n", diff.tv_sec, diff.tv_usec);
+    fflush(output[id]);
 }
 
 #endif
