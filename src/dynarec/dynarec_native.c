@@ -682,11 +682,12 @@ static void diff_block(
 #define BENCH_PASS2 2
 #define BENCH_PASS3 3
 #define BENCH_PASS4 4
-#define BENCH_CS2C 5
-#define BENCH_CACHE_FLUSH 6
+#define BENCH_CS2C_LOOKUP_SUCC 5
+#define BENCH_CS2C_LOOKUP_FAIL 6
+#define BENCH_CACHE_FLUSH 7
 
 void bench_output(int id, const struct timeval *st, const struct timeval *ed) {
-    static FILE *output[7] = {NULL};
+    static FILE *output[8] = {NULL};
     if (!output[id]) {
         char name[256] = {0};
         sprintf(name, "bench_%d.txt", id);
@@ -920,18 +921,24 @@ void* FillBlock64(
         const void* host_code;
         size_t host_code_size;
         ret = cs2c_lookup(elf_path, addr - elf_delta, end - addr, &code_sign, (const void **)&host_meta, &host_meta_size, &host_code, &host_code_size);
-        if (box64_cs2c_bench) {
-            // Bench CS2C end
-            gettimeofday(&ed, NULL);
-            bench_output(BENCH_CS2C, &st, &ed);
-        }
+
 
         switch (ret) {
             case 0:
+                if (box64_cs2c_bench) {
+                    // Bench CS2C end
+                    gettimeofday(&ed, NULL);
+                    bench_output(BENCH_CS2C_LOOKUP_SUCC, &st, &ed);
+                }
                 // Cache Hit
                 dynarec_log(LOG_DEBUG, "CS2 Cache Hit: %p\n", (void*)addr);
                 break;
             case -ENOENT:
+                if (box64_cs2c_bench) {
+                    // Bench CS2C end
+                    gettimeofday(&ed, NULL);
+                    bench_output(BENCH_CS2C_LOOKUP_FAIL, &st, &ed);
+                }
                 // Cache Miss
                 goto slow_path;
             default:
