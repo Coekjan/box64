@@ -684,10 +684,12 @@ static void diff_block(
 #define BENCH_PASS4 4
 #define BENCH_CS2C_LOOKUP_SUCC 5
 #define BENCH_CS2C_LOOKUP_FAIL 6
-#define BENCH_CACHE_FLUSH 7
+#define BENCH_CS2C_SYNC 7
+#define BENCH_CACHE_FLUSH 8
+#define BENCH_LEN 9
 
 void bench_output(int id, const struct timeval *st, const struct timeval *ed) {
-    static FILE *output[8] = {NULL};
+    static FILE *output[BENCH_LEN] = {NULL};
     if (!output[id]) {
         char name[256] = {0};
         sprintf(name, "bench_%d.txt", id);
@@ -1251,7 +1253,16 @@ slow_path:
             // FIXME: FREE block hit?
         }
         if (!cs2c_cache_hit) {
+            if (box64_cs2c_bench) {
+                // Bench CS2C sync begin
+                gettimeofday(&st, NULL);
+            }
             cs2c_sync(elf_path, addr - elf_delta, end - addr, &code_sign, &host_metadata, sizeof(host_metadata), p, host_metadata.native_size);
+            if (box64_cs2c_bench) {
+                // Bench CS2C sync end
+                gettimeofday(&ed, NULL);
+                bench_output(BENCH_CS2C_SYNC, &st, &ed);
+            }
         }
     }
 #endif
