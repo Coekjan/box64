@@ -156,6 +156,9 @@ typedef struct dynarec_rv64_s {
     uint8_t             abort;
     uint8_t             vector_sew; // current sew status
     uint8_t             vector_eew; // current effective sew status, should only be used after SET_ELEMENT_WIDTH
+#ifdef CS2
+    int                 skip_preload;
+#endif
 } dynarec_rv64_t;
 
 // v0 is hardware wired to vector mask register, which should be always reserved

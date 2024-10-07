@@ -1557,9 +1557,15 @@ void* PreloadFillBlock64(
     helper.native_size = 0;
     helper.table64size = 0; // reset table64 (but not the cap)
     helper.insts_size = 0;  // reset
+    helper.skip_preload = 0;
 
     native_pass4(&helper, addr, alternate, is32bits);
 
+    if (helper.skip_preload) {
+        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Skip preload: %p\n", (void*)addr);
+        CancelBlock64(0);
+        return NULL;
+    }
     size_t rounded_native_size = (helper.native_size + 7) & ~7;
     if (rounded_native_size != host_meta->native_size) {
         dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);

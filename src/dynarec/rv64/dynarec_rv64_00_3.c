@@ -875,6 +875,9 @@ uintptr_t dynarec64_00_3(dynarec_rv64_t* dyn, uintptr_t addr, uintptr_t ip, int 
                     SKIPTEST(x1);
                     BARRIER(BARRIER_FULL);
                     if(dyn->last_ip && (addr-dyn->last_ip<0x1000)) {
+#if defined(CS2) && STEP == 4
+                        dyn->skip_preload = 1;
+#endif
                         ADDI(x2, xRIP, addr-dyn->last_ip);
                     } else {
                         TABLE64(x2, addr);
@@ -941,6 +944,9 @@ uintptr_t dynarec64_00_3(dynarec_rv64_t* dyn, uintptr_t addr, uintptr_t ip, int 
                     }*/
 
                     if(rex.is32bits) {
+#if defined(CS2) && STEP == 4
+                        dyn->skip_preload = 1;
+#endif
                         MOV32w(x2, addr);
                     } else {
                         TABLE64(x2, addr);
