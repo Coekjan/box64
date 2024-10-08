@@ -958,6 +958,9 @@ uintptr_t dynarec64_00_3(dynarec_rv64_t* dyn, uintptr_t addr, uintptr_t ip, int 
                         // Push actual return address
                         if(addr < (dyn->start+dyn->isize)) {
                             // there is a next...
+#if defined(CS2) && STEP == 4
+                            dyn->skip_preload = 1;
+#endif
                             j64 = (dyn->insts)?(dyn->insts[ninst].epilog-(dyn->native_size)):0;
                             AUIPC(x4, ((j64 + 0x800) >> 12) & 0xfffff);
                             ADDI(x4, x4, j64 & 0xfff);
@@ -1418,6 +1421,9 @@ uintptr_t dynarec64_00_3(dynarec_rv64_t* dyn, uintptr_t addr, uintptr_t ip, int 
                         // Push actual return address
                         if(addr < (dyn->start+dyn->isize)) {
                             // there is a next...
+#if defined(CS2) && STEP == 4
+                            dyn->skip_preload = 1;
+#endif
                             j64 = (dyn->insts)?(dyn->insts[ninst].epilog-(dyn->native_size)):0;
                             AUIPC(x4, ((j64 + 0x800) >> 12) & 0xfffff);
                             ADDI(x4, x4, j64 & 0xfff);

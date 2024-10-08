@@ -1048,11 +1048,13 @@
         uint64_t _delta_ip = (A)-dyn->last_ip;       \
         dyn->last_ip += _delta_ip;                   \
         if (_delta_ip) {                             \
+            if (STEP == 4) dyn->skip_preload = 1;    \
             ADDI(xRIP, xRIP, _delta_ip);             \
         }                                            \
     } else {                                         \
         dyn->last_ip = (A);                          \
         if (dyn->last_ip < 0xffffffff) {             \
+            if (STEP == 4) dyn->skip_preload = 1;    \
             MOV64x(xRIP, dyn->last_ip);              \
         } else                                       \
             TABLE64(xRIP, dyn->last_ip);             \
@@ -1060,9 +1062,13 @@
 #define GETIP_(A)                                       \
     if (dyn->last_ip && ((A)-dyn->last_ip) < 2048) {    \
         int64_t _delta_ip = (A)-dyn->last_ip;           \
-        if (_delta_ip) { ADDI(xRIP, xRIP, _delta_ip); } \
+        if (_delta_ip) {                                \
+            if (STEP == 4) dyn->skip_preload = 1;       \
+            ADDI(xRIP, xRIP, _delta_ip);                \
+        }                                               \
     } else {                                            \
         if ((A) < 0xffffffff) {                         \
+            if (STEP == 4) dyn->skip_preload = 1;       \
             MOV64x(xRIP, (A));                          \
         } else                                          \
             TABLE64(xRIP, (A));                         \
