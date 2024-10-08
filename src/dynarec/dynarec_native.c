@@ -562,6 +562,7 @@ typedef struct {
     int block_isize;
     uint8_t block_always_test;
     uint8_t block_dirty;
+    int skip_preload;
 } cs2c_meta_t;
 
 #define DIFF(x) \
@@ -1140,6 +1141,9 @@ slow_path:
     helper.native_size = 0;
     helper.table64size = 0; // reset table64 (but not the cap)
     helper.insts_size = 0;  // reset
+#ifdef CS2
+    helper.skip_preload = 0;
+#endif
     native_pass3(&helper, addr, alternate, is32bits);
     if(helper.abort) {
         if(box64_dynarec_dump || box64_dynarec_log)dynarec_log(LOG_NONE, "Abort dynablock on pass3\n");
@@ -1165,6 +1169,7 @@ slow_path:
         host_metadata.native_size = native_size;
         host_metadata.insts_rsize = insts_rsize;
         host_metadata.block_isize = block->isize;
+        host_metadata.skip_preload = helper.skip_preload;
     }
 #endif
     *(dynablock_t**)next = block;
@@ -1292,6 +1297,12 @@ void PreloadBlock64(void* data, const CacheTableDataRaw* cs2_block)
     dynablock_t* block;
     cs2c_preload_ctx* ctx = (cs2c_preload_ctx*)data;
 
+    cs2c_meta_t* meta = (cs2c_meta_t*)cs2_block->host_meta;
+    assert(cs2_block->host_meta_len == sizeof(cs2c_meta_t));
+    if (meta->skip_preload) {
+        return;
+    }
+
     cs2c_preloading = 1;
 
     // Step 1: Check if the block is already in DB or should be ignored. If it is, skip it.
@@ -1299,10 +1310,12 @@ void PreloadBlock64(void* data, const CacheTableDataRaw* cs2_block)
     void* end = (void*)((uintptr_t)start + cs2_block->guest_size);
 
     if ((uintptr_t)start >= box64_nodynarec_start && (uintptr_t)start < box64_nodynarec_end) {
+        cs2c_preloading = 0;
         return;
     }
 
     if (hasAlternate((void*)start) || getDB((uintptr_t)start)) {
+        cs2c_preloading = 0;
         return;
     }
 
@@ -1311,14 +1324,17 @@ void PreloadBlock64(void* data, const CacheTableDataRaw* cs2_block)
     CodeSign code_sign;
     if (sigsetjmp(DYN_JMPBUF, 1)) {
         dynarec_log(LOG_NONE, "Calculation of sign at %p triggered a segfault, skipping\n", start);
+        cs2c_preloading = 0;
         return;
     }
     if ((err = cs2c_calc_sign(start, end - start, &code_sign)) < 0) {
         dynarec_log(LOG_NONE, "CS2 Failed to calculate sign: %d\n", err);
+        cs2c_preloading = 0;
         return;
     }
     if (!cs2c_test_sign(&code_sign, cs2_block->guest_sign)) {
         dynarec_log(LOG_DEBUG, "CS2 Code sign mismatch\n");
+        cs2c_preloading = 0;
         return;
     }
 
@@ -1330,10 +1346,9 @@ void PreloadBlock64(void* data, const CacheTableDataRaw* cs2_block)
     if (sigsetjmp(DYN_JMPBUF, 1)) {
         printf_log(LOG_INFO, "PreloadFillblock64 at %p triggered a segfault, canceling\n", start);
         FreeDynablock(block, 0);
+        cs2c_preloading = 0;
         return;
     }
-    cs2c_meta_t* meta = (cs2c_meta_t*)cs2_block->host_meta;
-    assert(cs2_block->host_meta_len == sizeof(cs2c_meta_t));
     void* ret = PreloadFillBlock64(ctx, block, (uintptr_t)start, meta->alternate, ctx->is32bits, cs2_block);
     if (!ret) {
         dynarec_log(LOG_DEBUG, "PreloadFillblock64 of block %p for %p returned an error\n", block, start);
@@ -1557,15 +1572,9 @@ void* PreloadFillBlock64(
     helper.native_size = 0;
     helper.table64size = 0; // reset table64 (but not the cap)
     helper.insts_size = 0;  // reset
-    helper.skip_preload = 0;
 
     native_pass4(&helper, addr, alternate, is32bits);
 
-    if (helper.skip_preload) {
-        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Skip preload: %p\n", (void*)addr);
-        CancelBlock64(0);
-        return NULL;
-    }
     size_t rounded_native_size = (helper.native_size + 7) & ~7;
     if (rounded_native_size != host_meta->native_size) {
         dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
