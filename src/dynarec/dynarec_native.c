@@ -995,9 +995,8 @@ void* FillBlock64(
 
         native_pass4(&helper, addr, alternate, is32bits);
 
-        size_t rounded_native_size = (helper.native_size + 7) & ~7;
-        if (rounded_native_size != host_meta->native_size) {
-            dynarec_log(LOG_DEBUG, "CACHE ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+        if (helper.native_size != host_meta->real_native_size) {
+            dynarec_log(LOG_DEBUG, "CACHE ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, helper.native_size, host_meta->real_native_size);
             CancelBlock64(0);
             return (void*)(-1);
         }
@@ -1575,9 +1574,8 @@ void* PreloadFillBlock64(
 
     native_pass4(&helper, addr, alternate, is32bits);
 
-    size_t rounded_native_size = (helper.native_size + 7) & ~7;
-    if (rounded_native_size != host_meta->native_size) {
-        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, rounded_native_size, host_meta->native_size);
+    if (helper.native_size != host_meta->real_native_size) {
+        dynarec_log(LOG_DEBUG, "PRELOAD ABORT!! CS2 Native size mismatch: %p (%zu vs %zu)\n", (void*)addr, helper.native_size, host_meta->real_native_size);
         CancelBlock64(0);
         return NULL;
     }
