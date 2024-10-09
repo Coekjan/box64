@@ -2458,12 +2458,26 @@ void rv64_move32(dynarec_rv64_t* dyn, int ninst, int reg, int32_t val, int zerou
     int32_t hi20 = (val+0x800)>>12 & 0xfffff;
     int32_t lo12 = val&0xfff;
 
+#if defined(CS2) && STEP == 4
+#pragma push_macro("EMIT")
+#undef EMIT
+#define EMIT(A)                                     \
+    do {                                            \
+        *(uint32_t*)(dyn->block) = (uint32_t)(A);   \
+        dyn->block += 4;                            \
+        dyn->insts[ninst].size += 4;                \
+        dyn->native_size += 4;                      \
+    } while (0)
+#endif
     int src = xZR;
     if (hi20) {
         LUI(reg, hi20);
         src = reg;
     }
     if (lo12 || !hi20) ADDIW(reg, src, lo12);
+#if defined(CS2) && STEP == 4
+#pragma pop_macro("EMIT")
+#endif
     if (zeroup && (val & 0x80000000)) {
         ZEROUP(reg);
     }
@@ -2471,6 +2485,17 @@ void rv64_move32(dynarec_rv64_t* dyn, int ninst, int reg, int32_t val, int zerou
 
 void rv64_move64(dynarec_rv64_t* dyn, int ninst, int reg, int64_t val)
 {
+#if defined(CS2) && STEP == 4
+#pragma push_macro("EMIT")
+#undef EMIT
+#define EMIT(A)                                     \
+    do {                                            \
+        *(uint32_t*)(dyn->block) = (uint32_t)(A);   \
+        dyn->block += 4;                            \
+        dyn->insts[ninst].size += 4;                \
+        dyn->native_size += 4;                      \
+    } while (0)
+#endif
     if(((val<<32)>>32)==val) {
         // 32bits value
         rv64_move32(dyn, ninst, reg, val, 0);
@@ -2487,6 +2512,9 @@ void rv64_move64(dynarec_rv64_t* dyn, int ninst, int reg, int64_t val)
     if (lo12) {
         ADDI(reg, reg, lo12);
     }
+#if defined(CS2) && STEP == 4
+#pragma pop_macro("EMIT")
+#endif // STEP == 4
 }
 
 void fpu_reflectcache(dynarec_rv64_t* dyn, int ninst, int s1, int s2, int s3)

@@ -1054,7 +1054,6 @@
     } else {                                         \
         dyn->last_ip = (A);                          \
         if (dyn->last_ip < 0xffffffff) {             \
-            if (STEP == 4) dyn->skip_preload = 1;    \
             MOV64x(xRIP, dyn->last_ip);              \
         } else                                       \
             TABLE64(xRIP, dyn->last_ip);             \
@@ -1068,7 +1067,6 @@
         }                                               \
     } else {                                            \
         if ((A) < 0xffffffff) {                         \
-            if (STEP == 4) dyn->skip_preload = 1;       \
             MOV64x(xRIP, (A));                          \
         } else                                          \
             TABLE64(xRIP, (A));                         \
